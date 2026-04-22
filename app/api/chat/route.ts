@@ -4,12 +4,13 @@ import { filesystemTools, execFilesystemTool } from '@/lib/tools/filesystem'
 import { bashTools, execBashTool } from '@/lib/tools/bash'
 import { memoryTools, execMemoryTool } from '@/lib/tools/memory'
 import { webTools, execWebTool } from '@/lib/tools/web'
+import { crmTools, execCrmTool } from '@/lib/tools/crm'
 import { parseSkillFromMessage, SKILLS } from '@/lib/skills'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const MODEL = 'claude-sonnet-4-6'
 
-const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools]
+const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...crmTools]
 
 const BASE_SYSTEM = `You are Nexter Studio — an AI assistant running locally on the user's machine.
 
@@ -133,6 +134,8 @@ export async function POST(req: NextRequest) {
             result = await execMemoryTool(tu.name, parsedInput)
           } else if (webTools.find((t) => t.name === tu.name)) {
             result = await execWebTool(tu.name, parsedInput)
+          } else if (crmTools.find((t) => t.name === tu.name)) {
+            result = await execCrmTool(tu.name, parsedInput)
           } else {
             result = `Unknown tool: ${tu.name}`
           }
