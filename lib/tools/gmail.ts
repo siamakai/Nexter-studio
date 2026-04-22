@@ -65,13 +65,17 @@ export async function execGmailTool(name: string, input: Record<string, unknown>
     }
 
     case 'gmail_send_email': {
+      const fromEmail = process.env.GOOGLE_ACCOUNT_EMAIL || 'me'
       const message = [
+        `From: ${fromEmail}`,
         `To: ${input.to}`,
         `Subject: ${input.subject}`,
+        'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
+        'Content-Transfer-Encoding: 7bit',
         '',
         input.body as string,
-      ].join('\n')
+      ].join('\r\n')
 
       const encoded = Buffer.from(message).toString('base64url')
       await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encoded } })
