@@ -42,14 +42,24 @@ export async function getAuthedClient() {
   client.setCredentials({
     access_token: data.access_token,
     refresh_token: data.refresh_token,
+    expiry_date: data.expiry_date,
   })
 
-  // Auto-refresh if expired
+  // Persist refreshed tokens back to Supabase
   client.on('tokens', async (tokens) => {
-    if (tokens.access_token) {
-      await supabase.from('google_tokens').update({ access_token: tokens.access_token }).eq('email', data.email)
+    const update: Record<string, unknown> = {}
+    if (tokens.access_token) update.access_token = tokens.access_token
+    if (tokens.expiry_date) update.expiry_date = tokens.expiry_date
+    if (Object.keys(update).length) {
+      await supabase.from('google_tokens').update(update).eq('email', data.email)
     }
   })
+
+  // Force refresh now if token is expired or missing
+  const isExpired = !data.access_token || (data.expiry_date && Date.now() > data.expiry_date - 60000)
+  if (isExpired) {
+    await client.getAccessToken()
+  }
 
   return client
 }
