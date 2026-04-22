@@ -4,8 +4,17 @@ import { createClient } from '@supabase/supabase-js'
 import { google } from 'googleapis'
 
 export async function GET(req: NextRequest) {
+  // Google sends ?error=access_denied when the user cancels or the app isn't verified
+  const oauthError = req.nextUrl.searchParams.get('error')
+  if (oauthError) {
+    const msg = oauthError === 'access_denied'
+      ? 'access_denied — your Google account may not be whitelisted. Use the manual token option.'
+      : oauthError
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/connect?error=${encodeURIComponent(msg)}`)
+  }
+
   const code = req.nextUrl.searchParams.get('code')
-  if (!code) return NextResponse.json({ error: 'No code' }, { status: 400 })
+  if (!code) return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/connect?error=No+authorization+code+received`)
 
   try {
     const client = getOAuthClient()
