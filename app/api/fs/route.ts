@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs/promises'
-import path from 'path'
-import { existsSync } from 'fs'
 
 const HOME = process.env.HOME || '/'
 
@@ -9,7 +6,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const dirPath = searchParams.get('path') || HOME
 
+  // Filesystem browsing only works in local mode
+  if (process.env.NODE_ENV === 'production' && !process.env.ENABLE_FS) {
+    return NextResponse.json({ items: [], current: dirPath, parent: dirPath, note: 'File browser disabled in cloud mode' })
+  }
+
   try {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const { existsSync } = await import('fs')
+
     const entries = await fs.readdir(dirPath, { withFileTypes: true })
     const items = await Promise.all(
       entries
