@@ -7,12 +7,14 @@ import { webTools, execWebTool } from '@/lib/tools/web'
 import { crmTools, execCrmTool } from '@/lib/tools/crm'
 import { gmailTools, execGmailTool } from '@/lib/tools/gmail'
 import { calendarTools, execCalendarTool } from '@/lib/tools/calendar'
+import { calendlyTools, execCalendlyTool } from '@/lib/tools/calendly'
+import { zoomTools, execZoomTool } from '@/lib/tools/zoom'
 import { parseSkillFromMessage, SKILLS } from '@/lib/skills'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const MODEL = 'claude-sonnet-4-6'
 
-const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...crmTools, ...gmailTools, ...calendarTools]
+const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...crmTools, ...gmailTools, ...calendarTools, ...calendlyTools, ...zoomTools]
 
 const BASE_SYSTEM = `You are Nexter Studio — an AI assistant running locally on the user's machine.
 
@@ -21,6 +23,10 @@ You have full access to:
 - Bash/terminal (run any shell command)
 - Long-term memory (save and recall information across sessions)
 - Web (fetch URLs and pages)
+- Calendly (list upcoming bookings, get invitee details)
+- Zoom (create meetings and get join links)
+- Gmail (read inbox, send emails)
+- Google Calendar (list events, create events with Zoom links)
 
 Your working directory and home folder are fully accessible.
 
@@ -142,6 +148,10 @@ export async function POST(req: NextRequest) {
             result = await execGmailTool(tu.name, parsedInput)
           } else if (calendarTools.find((t) => t.name === tu.name)) {
             result = await execCalendarTool(tu.name, parsedInput)
+          } else if (calendlyTools.find((t) => t.name === tu.name)) {
+            result = await execCalendlyTool(tu.name, parsedInput)
+          } else if (zoomTools.find((t) => t.name === tu.name)) {
+            result = await execZoomTool(tu.name, parsedInput)
           } else {
             result = `Unknown tool: ${tu.name}`
           }
