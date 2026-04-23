@@ -1,4 +1,5 @@
-const GHL_BASE = 'https://rest.gohighlevel.com/v1'
+const GHL_BASE = 'https://services.leadconnectorhq.com'
+const GHL_VERSION = '2021-07-28'
 
 async function ghlFetch(path: string, options: RequestInit = {}) {
   const res = await fetch(`${GHL_BASE}${path}`, {
@@ -6,11 +7,18 @@ async function ghlFetch(path: string, options: RequestInit = {}) {
     headers: {
       Authorization: `Bearer ${process.env.GHL_API_KEY}`,
       'Content-Type': 'application/json',
+      Version: GHL_VERSION,
       ...(options.headers || {}),
     },
   })
   if (!res.ok) throw new Error(`GHL API error ${res.status}: ${await res.text()}`)
   return res.json()
+}
+
+function locationId() {
+  const id = process.env.GHL_LOCATION_ID
+  if (!id) throw new Error('GHL_LOCATION_ID env var not set.')
+  return id
 }
 
 export const ghlTools = [
@@ -25,8 +33,8 @@ export const ghlTools = [
         email: { type: 'string' },
         phone: { type: 'string' },
         company_name: { type: 'string' },
-        source: { type: 'string', description: 'Lead source e.g. Website, Referral, Email' },
-        tags: { type: 'array', items: { type: 'string' }, description: 'Tags to apply to the contact' },
+        source: { type: 'string', description: 'Lead source e.g. Website, Referral' },
+        tags: { type: 'array', items: { type: 'string' } },
         notes: { type: 'string', description: 'Initial note about this contact' },
       },
       required: ['email'],
@@ -57,7 +65,7 @@ export const ghlTools = [
   },
   {
     name: 'ghl_update_contact',
-    description: 'Update a contact in Go High Level — change tags, status, custom fields, etc.',
+    description: 'Update a GHL contact — change tags, name, company, etc.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -74,7 +82,7 @@ export const ghlTools = [
   },
   {
     name: 'ghl_add_note',
-    description: 'Add a note to a GHL contact — log a call, meeting outcome, or any interaction.',
+    description: 'Add a note to a GHL contact — log a call, meeting, or interaction.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -85,24 +93,8 @@ export const ghlTools = [
     },
   },
   {
-    name: 'ghl_create_opportunity',
-    description: 'Create a sales opportunity/deal in a GHL pipeline for a contact.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        contact_id: { type: 'string' },
-        pipeline_id: { type: 'string', description: 'GHL pipeline ID' },
-        stage_id: { type: 'string', description: 'GHL pipeline stage ID' },
-        title: { type: 'string', description: 'Opportunity title/name' },
-        monetary_value: { type: 'number', description: 'Deal value in dollars' },
-        status: { type: 'string', description: 'open, won, lost, or abandoned' },
-      },
-      required: ['contact_id', 'pipeline_id', 'stage_id', 'title'],
-    },
-  },
-  {
     name: 'ghl_get_pipelines',
-    description: 'List all pipelines and their stages in Go High Level.',
+    description: 'List all sales pipelines and their stages in Go High Level.',
     input_schema: {
       type: 'object' as const,
       properties: {},
@@ -110,13 +102,29 @@ export const ghlTools = [
   },
   {
     name: 'ghl_list_opportunities',
-    description: 'List opportunities/deals in a GHL pipeline with their stages and values.',
+    description: 'List deals/opportunities in a GHL pipeline.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        pipeline_id: { type: 'string', description: 'Pipeline ID to list opportunities from' },
-        status: { type: 'string', description: 'Filter: open, won, lost, abandoned (default: open)' },
+        pipeline_id: { type: 'string' },
+        status: { type: 'string', description: 'open, won, lost, or abandoned (default: open)' },
       },
+    },
+  },
+  {
+    name: 'ghl_create_opportunity',
+    description: 'Create a sales opportunity/deal in a GHL pipeline for a contact.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contact_id: { type: 'string' },
+        pipeline_id: { type: 'string' },
+        stage_id: { type: 'string' },
+        title: { type: 'string' },
+        monetary_value: { type: 'number' },
+        status: { type: 'string', description: 'open, won, lost, or abandoned' },
+      },
+      required: ['contact_id', 'pipeline_id', 'stage_id', 'title'],
     },
   },
 ]
@@ -129,6 +137,7 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
   switch (name) {
     case 'ghl_create_contact': {
       const body: Record<string, unknown> = {
+        locationId: locationId(),
         email: input.email,
         firstName: input.first_name,
         lastName: input.last_name,
@@ -142,11 +151,10 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
       const data = await ghlFetch('/contacts/', { method: 'POST', body: JSON.stringify(body) })
       const contact = data.contact
 
-      // Add note if provided
       if (input.notes && contact?.id) {
         await ghlFetch(`/contacts/${contact.id}/notes/`, {
           method: 'POST',
-          body: JSON.stringify({ body: input.notes }),
+          body: JSON.stringify({ body: input.notes, userId: contact.id }),
         })
       }
 
@@ -154,7 +162,9 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
     }
 
     case 'ghl_search_contacts': {
-      const data = await ghlFetch(`/contacts/search/?query=${encodeURIComponent(input.query as string)}&limit=${input.limit || 10}`)
+      const data = await ghlFetch(
+        `/contacts/?locationId=${locationId()}&query=${encodeURIComponent(input.query as string)}&limit=${input.limit || 10}`
+      )
       const contacts = data.contacts || []
       if (!contacts.length) return 'No contacts found.'
       return contacts.map((c: Record<string, string>) =>
@@ -171,7 +181,6 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
         `Phone: ${c.phone || ''}`,
         `Company: ${c.companyName || ''}`,
         `Tags: ${(c.tags || []).join(', ') || 'none'}`,
-        `Source: ${c.source || ''}`,
         `ID: ${c.id}`,
       ].join('\n')
     }
@@ -199,8 +208,33 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
       return `Note added to contact ${input.contact_id}.`
     }
 
+    case 'ghl_get_pipelines': {
+      const data = await ghlFetch(`/opportunities/pipelines/?locationId=${locationId()}`)
+      const pipelines = data.pipelines || []
+      if (!pipelines.length) return 'No pipelines found.'
+      return pipelines.map((p: Record<string, unknown>) => {
+        const stages = ((p.stages as Record<string, string>[]) || [])
+          .map((s) => `    - ${s.name} (ID: ${s.id})`).join('\n')
+        return `Pipeline: ${p.name} (ID: ${p.id})\n${stages}`
+      }).join('\n\n')
+    }
+
+    case 'ghl_list_opportunities': {
+      const params = new URLSearchParams({ locationId: locationId() })
+      if (input.pipeline_id) params.set('pipelineId', input.pipeline_id as string)
+      params.set('status', (input.status as string) || 'open')
+
+      const data = await ghlFetch(`/opportunities/search/?${params}`)
+      const opps = data.opportunities || []
+      if (!opps.length) return 'No opportunities found.'
+      return opps.map((o: Record<string, unknown>) =>
+        `💼 ${o.name} | Stage: ${(o.pipelineStage as Record<string, string>)?.name || '?'} | $${o.monetaryValue || 0} | ID: ${o.id}`
+      ).join('\n')
+    }
+
     case 'ghl_create_opportunity': {
       const body = {
+        locationId: locationId(),
         contactId: input.contact_id,
         pipelineId: input.pipeline_id,
         pipelineStageId: input.stage_id,
@@ -211,30 +245,6 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
       const data = await ghlFetch('/opportunities/', { method: 'POST', body: JSON.stringify(body) })
       const opp = data.opportunity
       return `Opportunity created:\nTitle: ${opp?.name}\nValue: $${opp?.monetaryValue || 0}\nID: ${opp?.id}`
-    }
-
-    case 'ghl_get_pipelines': {
-      const data = await ghlFetch('/opportunities/pipelines/')
-      const pipelines = data.pipelines || []
-      if (!pipelines.length) return 'No pipelines found.'
-      return pipelines.map((p: Record<string, unknown>) => {
-        const stages = ((p.stages as Record<string, string>[]) || []).map((s) => `    - ${s.name} (ID: ${s.id})`).join('\n')
-        return `Pipeline: ${p.name} (ID: ${p.id})\n${stages}`
-      }).join('\n\n')
-    }
-
-    case 'ghl_list_opportunities': {
-      const params = new URLSearchParams()
-      if (input.pipeline_id) params.set('pipelineId', input.pipeline_id as string)
-      params.set('status', (input.status as string) || 'open')
-      params.set('limit', '20')
-
-      const data = await ghlFetch(`/opportunities/search/?${params}`)
-      const opps = data.opportunities || []
-      if (!opps.length) return 'No opportunities found.'
-      return opps.map((o: Record<string, unknown>) =>
-        `💼 ${o.name} | Stage: ${(o.pipelineStage as Record<string, string>)?.name || '?'} | $${o.monetaryValue || 0} | ID: ${o.id}`
-      ).join('\n')
     }
 
     default:
