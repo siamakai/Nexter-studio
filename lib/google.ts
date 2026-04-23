@@ -25,8 +25,8 @@ export function getAuthUrl() {
   })
 }
 
-export async function getAuthedClient() {
-  const accountEmail = process.env.GOOGLE_ACCOUNT_EMAIL
+export async function getAuthedClient(emailOverride?: string) {
+  const accountEmail = emailOverride || process.env.GOOGLE_ACCOUNT_EMAIL
   if (!accountEmail) throw new Error('GOOGLE_ACCOUNT_EMAIL env var not set.')
 
   const supabase = createClient(

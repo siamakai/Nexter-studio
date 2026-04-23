@@ -1,6 +1,11 @@
 import { google } from 'googleapis'
 import { getAuthedClient } from '@/lib/google'
 
+const ACCOUNT_PROP = {
+  type: 'string',
+  description: 'Which Google account to use (e.g. info@i-review.ai). Defaults to primary account if not specified.',
+}
+
 export const calendarTools = [
   {
     name: 'calendar_list_events',
@@ -8,6 +13,7 @@ export const calendarTools = [
     input_schema: {
       type: 'object' as const,
       properties: {
+        account_email: ACCOUNT_PROP,
         days_ahead: { type: 'number', description: 'How many days ahead to look (default 7)' },
         max_results: { type: 'number', description: 'Max events to return (default 10)' },
       },
@@ -19,12 +25,13 @@ export const calendarTools = [
     input_schema: {
       type: 'object' as const,
       properties: {
+        account_email: ACCOUNT_PROP,
         title: { type: 'string', description: 'Event title' },
         start_datetime: { type: 'string', description: 'ISO 8601 datetime e.g. 2026-04-25T14:00:00' },
         end_datetime: { type: 'string', description: 'ISO 8601 datetime e.g. 2026-04-25T15:00:00' },
         description: { type: 'string', description: 'Event description or notes' },
         attendee_email: { type: 'string', description: 'Email of attendee to invite' },
-        location: { type: 'string', description: 'Location or meeting link' },
+        location: { type: 'string', description: 'Location or meeting link (e.g. Zoom URL)' },
       },
       required: ['title', 'start_datetime', 'end_datetime'],
     },
@@ -35,6 +42,7 @@ export const calendarTools = [
     input_schema: {
       type: 'object' as const,
       properties: {
+        account_email: ACCOUNT_PROP,
         event_id: { type: 'string', description: 'Google Calendar event ID' },
       },
       required: ['event_id'],
@@ -43,7 +51,7 @@ export const calendarTools = [
 ]
 
 export async function execCalendarTool(name: string, input: Record<string, unknown>): Promise<string> {
-  const auth = await getAuthedClient()
+  const auth = await getAuthedClient(input.account_email as string | undefined)
   const calendar = google.calendar({ version: 'v3', auth })
 
   switch (name) {
