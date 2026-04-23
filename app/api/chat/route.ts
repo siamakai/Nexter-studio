@@ -4,17 +4,17 @@ import { filesystemTools, execFilesystemTool } from '@/lib/tools/filesystem'
 import { bashTools, execBashTool } from '@/lib/tools/bash'
 import { memoryTools, execMemoryTool } from '@/lib/tools/memory'
 import { webTools, execWebTool } from '@/lib/tools/web'
-import { crmTools, execCrmTool } from '@/lib/tools/crm'
 import { gmailTools, execGmailTool } from '@/lib/tools/gmail'
 import { calendarTools, execCalendarTool } from '@/lib/tools/calendar'
 import { calendlyTools, execCalendlyTool } from '@/lib/tools/calendly'
 import { zoomTools, execZoomTool } from '@/lib/tools/zoom'
+import { ghlTools, execGhlTool } from '@/lib/tools/ghl'
 import { parseSkillFromMessage, SKILLS } from '@/lib/skills'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const MODEL = 'claude-sonnet-4-6'
 
-const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...crmTools, ...gmailTools, ...calendarTools, ...calendlyTools, ...zoomTools]
+const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...ghlTools, ...gmailTools, ...calendarTools, ...calendlyTools, ...zoomTools]
 
 const BASE_SYSTEM = `You are Nexter Studio — an AI assistant running locally on the user's machine.
 
@@ -23,10 +23,13 @@ You have full access to:
 - Bash/terminal (run any shell command)
 - Long-term memory (save and recall information across sessions)
 - Web (fetch URLs and pages)
+- Go High Level CRM (create/search contacts, add notes, manage pipeline opportunities)
+- Gmail (read inbox, send emails)
+- Google Calendar (list events, create events)
 - Calendly (list upcoming bookings, get invitee details)
 - Zoom (create meetings and get join links)
-- Gmail (read inbox, send emails)
-- Google Calendar (list events, create events with Zoom links)
+
+When a Calendly booking comes in, proactively: create a Zoom meeting, add a Google Calendar event with the Zoom link, and send a confirmation email to the invitee.
 
 Your working directory and home folder are fully accessible.
 
@@ -142,8 +145,8 @@ export async function POST(req: NextRequest) {
             result = await execMemoryTool(tu.name, parsedInput)
           } else if (webTools.find((t) => t.name === tu.name)) {
             result = await execWebTool(tu.name, parsedInput)
-          } else if (crmTools.find((t) => t.name === tu.name)) {
-            result = await execCrmTool(tu.name, parsedInput)
+          } else if (ghlTools.find((t) => t.name === tu.name)) {
+            result = await execGhlTool(tu.name, parsedInput)
           } else if (gmailTools.find((t) => t.name === tu.name)) {
             result = await execGmailTool(tu.name, parsedInput)
           } else if (calendarTools.find((t) => t.name === tu.name)) {
