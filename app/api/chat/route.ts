@@ -9,12 +9,13 @@ import { calendarTools, execCalendarTool } from '@/lib/tools/calendar'
 import { calendlyTools, execCalendlyTool } from '@/lib/tools/calendly'
 import { zoomTools, execZoomTool } from '@/lib/tools/zoom'
 import { ghlTools, execGhlTool } from '@/lib/tools/ghl'
+import { microsoftTools, execMicrosoftTool } from '@/lib/tools/microsoft'
 import { parseSkillFromMessage, SKILLS } from '@/lib/skills'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const MODEL = 'claude-sonnet-4-6'
 
-const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...ghlTools, ...gmailTools, ...calendarTools, ...calendlyTools, ...zoomTools]
+const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...ghlTools, ...gmailTools, ...calendarTools, ...microsoftTools, ...calendlyTools, ...zoomTools]
 
 const BASE_SYSTEM = `You are Nexter Studio — an AI assistant running locally on the user's machine.
 
@@ -26,6 +27,7 @@ You have full access to:
 - Go High Level CRM (create/search contacts, add notes, manage pipeline opportunities)
 - Gmail (read inbox, send emails)
 - Google Calendar (list events, create events)
+- Microsoft 365 / Outlook (read inbox, send email, calendar — use ms_* tools with account_email)
 - Calendly (list upcoming bookings, get invitee details)
 - Zoom (create meetings and get join links)
 
@@ -151,6 +153,8 @@ export async function POST(req: NextRequest) {
             result = await execGmailTool(tu.name, parsedInput)
           } else if (calendarTools.find((t) => t.name === tu.name)) {
             result = await execCalendarTool(tu.name, parsedInput)
+          } else if (microsoftTools.find((t) => t.name === tu.name)) {
+            result = await execMicrosoftTool(tu.name, parsedInput)
           } else if (calendlyTools.find((t) => t.name === tu.name)) {
             result = await execCalendlyTool(tu.name, parsedInput)
           } else if (zoomTools.find((t) => t.name === tu.name)) {
