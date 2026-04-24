@@ -8,12 +8,16 @@ function ConnectContent() {
   const success = params.get('success')
   const email = params.get('email')
   const error = params.get('error')
+  const token = params.get('token')
+  const provider = params.get('provider')
 
   const [showManual, setShowManual] = useState(false)
   const [refreshToken, setRefreshToken] = useState('')
   const [manualEmail, setManualEmail] = useState('info@i-review.ai')
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState<string | null>(null)
+
+  const [envKey, setEnvKey] = useState('')
 
   async function saveManualToken() {
     if (!refreshToken.trim()) return
@@ -27,9 +31,10 @@ function ConnectContent() {
       })
       const data = await res.json()
       if (data.ok) {
+        setEnvKey(data.env_key)
         setSaveResult('success')
       } else {
-        setSaveResult(data.error || 'Failed to save token')
+        setSaveResult(data.error || 'Failed to validate token')
       }
     } catch (e) {
       setSaveResult(String(e))
@@ -38,13 +43,39 @@ function ConnectContent() {
     }
   }
 
+  if (success && token) {
+    const envKey = provider === 'microsoft' ? 'MS_REFRESH_TOKEN' : 'GOOGLE_REFRESH_TOKEN'
+    return (
+      <div>
+        <div className="text-center mb-4">
+          <div className="text-3xl mb-2">✅</div>
+          <h2 className="text-white text-lg font-semibold">Authorized: {email}</h2>
+          <p className="text-zinc-400 text-sm mt-1">Add this to Vercel to activate the connection:</p>
+        </div>
+
+        <div className="bg-zinc-900 rounded-xl p-4 mb-4">
+          <p className="text-zinc-400 text-xs mb-1 font-mono">{envKey}</p>
+          <p className="text-emerald-400 font-mono text-xs break-all select-all">{token}</p>
+        </div>
+
+        <ol className="text-zinc-400 text-xs space-y-1 mb-5 list-decimal list-inside">
+          <li>Go to <strong className="text-white">vercel.com → nexter-studio → Settings → Environment Variables</strong></li>
+          <li>Add <strong className="text-white">{envKey}</strong> with the value above</li>
+          <li>Redeploy the project</li>
+        </ol>
+
+        <a href="/" className="block w-full bg-white text-black text-center py-3 rounded-lg font-medium hover:bg-zinc-100 transition">
+          Go to Studio →
+        </a>
+      </div>
+    )
+  }
+
   if (success) {
     return (
       <div className="text-center">
-        <div className="text-4xl mb-4">✅</div>
-        <h2 className="text-white text-xl font-semibold mb-2">Connected!</h2>
-        <p className="text-zinc-400 text-sm mb-1">Gmail and Calendar are now linked to</p>
-        <p className="text-emerald-400 font-mono text-sm mb-6">{email}</p>
+        <div className="text-3xl mb-2">✅</div>
+        <h2 className="text-white text-lg font-semibold mb-4">Connected: {email}</h2>
         <a href="/" className="block w-full bg-white text-black text-center py-3 rounded-lg font-medium hover:bg-zinc-100 transition">
           Go to Studio →
         </a>
@@ -54,10 +85,21 @@ function ConnectContent() {
 
   if (saveResult === 'success') {
     return (
-      <div className="text-center">
-        <div className="text-4xl mb-4">✅</div>
-        <h2 className="text-white text-xl font-semibold mb-2">Token saved!</h2>
-        <p className="text-zinc-400 text-sm mb-6">Gmail and Calendar are now connected for <span className="text-emerald-400">{manualEmail}</span>.</p>
+      <div>
+        <div className="text-center mb-4">
+          <div className="text-3xl mb-2">✅</div>
+          <h2 className="text-white text-lg font-semibold">Token validated for {manualEmail}</h2>
+          <p className="text-zinc-400 text-sm mt-1">Add this env var to Vercel to activate:</p>
+        </div>
+        <div className="bg-zinc-900 rounded-xl p-4 mb-4">
+          <p className="text-zinc-400 text-xs mb-1 font-mono">{envKey}</p>
+          <p className="text-emerald-400 font-mono text-xs break-all select-all">{refreshToken}</p>
+        </div>
+        <ol className="text-zinc-400 text-xs space-y-1 mb-5 list-decimal list-inside">
+          <li>Go to <strong className="text-white">vercel.com → nexter-studio → Settings → Environment Variables</strong></li>
+          <li>Add <strong className="text-white">{envKey}</strong> with the value above</li>
+          <li>Redeploy</li>
+        </ol>
         <a href="/" className="block w-full bg-white text-black text-center py-3 rounded-lg font-medium hover:bg-zinc-100 transition">
           Go to Studio →
         </a>

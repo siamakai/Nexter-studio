@@ -1,5 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
-
 const TOKEN_URL = `https://login.microsoftonline.com/${process.env.MS_TENANT_ID || 'common'}/oauth2/v2.0/token`
 const AUTH_URL = `https://login.microsoftonline.com/${process.env.MS_TENANT_ID || 'common'}/oauth2/v2.0/authorize`
 
@@ -38,7 +36,7 @@ export async function getMsTokensFromCode(code: string) {
   return res.json()
 }
 
-async function refreshMsToken(refreshToken: string) {
+async function refreshMsToken(refreshToken: string): Promise<string> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -51,40 +49,22 @@ async function refreshMsToken(refreshToken: string) {
     }),
   })
   if (!res.ok) throw new Error(`MS token refresh failed: ${await res.text()}`)
-  return res.json()
+  const data = await res.json()
+  return data.access_token
 }
 
 export async function getMsAccessToken(email: string): Promise<string> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  // Env var: MS_REFRESH_TOKEN for primary, MS_REFRESH_TOKEN_SIAMAK for others
+  const isPrimary = email === process.env.MS_ACCOUNT_EMAIL
+  const refreshToken = isPrimary
+    ? process.env.MS_REFRESH_TOKEN
+    : process.env[`MS_REFRESH_TOKEN_${email.split('@')[0].toUpperCase().replace(/[^A-Z0-9]/g, '_')}`]
 
-  const { data, error } = await supabase
-    .from('microsoft_tokens')
-    .select('*')
-    .eq('email', email)
-    .single()
-
-  if (error || !data) throw new Error(`Microsoft account ${email} not connected. Visit /connect to authorize.`)
-  if (!data.refresh_token) throw new Error(`No refresh token for ${email}. Visit /connect to re-authorize.`)
-
-  const isExpired = !data.access_token || (data.expiry_date && Date.now() > data.expiry_date - 60000)
-
-  if (isExpired) {
-    const tokens = await refreshMsToken(data.refresh_token)
-    const expiry_date = Date.now() + tokens.expires_in * 1000
-
-    await supabase.from('microsoft_tokens').update({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token || data.refresh_token,
-      expiry_date,
-    }).eq('email', email)
-
-    return tokens.access_token
+  if (!refreshToken) {
+    throw new Error(`Microsoft account ${email} not connected. Add MS_REFRESH_TOKEN to Vercel env vars. Get it from /connect.`)
   }
 
-  return data.access_token
+  return refreshMsToken(refreshToken)
 }
 
 export async function graphFetch(email: string, path: string, options: RequestInit = {}) {

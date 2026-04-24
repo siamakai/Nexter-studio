@@ -1,5 +1,4 @@
 import { google } from 'googleapis'
-import { createClient } from '@supabase/supabase-js'
 
 export const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
@@ -26,45 +25,28 @@ export function getAuthUrl() {
 }
 
 export async function getAuthedClient(emailOverride?: string) {
-  const accountEmail = emailOverride || process.env.GOOGLE_ACCOUNT_EMAIL
-  if (!accountEmail) throw new Error('GOOGLE_ACCOUNT_EMAIL env var not set.')
+  // Support multiple accounts via env vars: GOOGLE_REFRESH_TOKEN, GOOGLE_REFRESH_TOKEN_2, etc.
+  // Or a specific account key like GOOGLE_REFRESH_TOKEN_INFO (mapped by email)
+  const email = emailOverride || process.env.GOOGLE_ACCOUNT_EMAIL
+  if (!email) throw new Error('No Google account email configured.')
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  // Derive env var name from email: info@i-review.ai → GOOGLE_REFRESH_TOKEN (primary)
+  // secondary accounts: GOOGLE_REFRESH_TOKEN_SIAMAK, etc.
+  const isPrimary = email === process.env.GOOGLE_ACCOUNT_EMAIL
+  const refreshToken = isPrimary
+    ? process.env.GOOGLE_REFRESH_TOKEN
+    : process.env[`GOOGLE_REFRESH_TOKEN_${email.split('@')[0].toUpperCase().replace(/[^A-Z0-9]/g, '_')}`]
 
-  const { data, error } = await supabase
-    .from('google_tokens')
-    .select('*')
-    .eq('email', accountEmail)
-    .single()
-
-  if (error) throw new Error(`DB error fetching tokens: ${error.message}. Visit /connect to authorize.`)
-  if (!data) throw new Error(`No Google tokens found for ${accountEmail}. Visit /connect to authorize.`)
-  if (!data.refresh_token) throw new Error(`No refresh token for ${accountEmail}. Visit /connect to re-authorize.`)
+  if (!refreshToken) {
+    throw new Error(`No refresh token found for ${email}. Add GOOGLE_REFRESH_TOKEN to Vercel env vars. Get it from /connect.`)
+  }
 
   const client = getOAuthClient()
-  client.setCredentials({
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expiry_date: data.expiry_date,
-  })
+  client.setCredentials({ refresh_token: refreshToken })
 
-  // Persist any refreshed tokens back to Supabase
-  client.on('tokens', async (tokens) => {
-    const update: Record<string, unknown> = {}
-    if (tokens.access_token) update.access_token = tokens.access_token
-    if (tokens.expiry_date) update.expiry_date = tokens.expiry_date
-    if (tokens.refresh_token) update.refresh_token = tokens.refresh_token
-    if (Object.keys(update).length) {
-      await supabase.from('google_tokens').update(update).eq('email', accountEmail)
-    }
-  })
-
-  // Always get a fresh access token (googleapis handles caching; refreshes if expired)
+  // Ensure we have a valid access token
   const { token } = await client.getAccessToken()
-  if (!token) throw new Error(`Could not obtain access token for ${accountEmail}. Try re-connecting at /connect.`)
+  if (!token) throw new Error(`Could not obtain access token for ${email}. Try reconnecting at /connect.`)
 
   return client
 }
