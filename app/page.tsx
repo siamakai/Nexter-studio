@@ -31,6 +31,10 @@ const TOOL_ICONS: Record<string, string> = {
 }
 
 export default function StudioPage() {
+  type Attachment = { name: string; type: string; data: string; preview?: string }
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
@@ -55,6 +59,20 @@ Type **/** to see all available skills, or just ask me anything.`,
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  function handleFiles(files: FileList | null) {
+    if (!files) return
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const result = e.target?.result as string
+        const data = result.split(',')[1] // strip data:...;base64,
+        const preview = file.type.startsWith('image/') ? result : undefined
+        setAttachments((prev) => [...prev, { name: file.name, type: file.type, data, preview }])
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -71,6 +89,8 @@ Type **/** to see all available skills, or just ask me anything.`,
     setInput('')
     setShowSkills(false)
 
+    const currentAttachments = [...attachments]
+    setAttachments([])
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: msg }
     const assistantId = (Date.now() + 1).toString()
     const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', tools: [], streaming: true }
@@ -87,7 +107,7 @@ Type **/** to see all available skills, or just ask me anything.`,
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, history, workspaceRoot }),
+        body: JSON.stringify({ message: msg, history, workspaceRoot, attachments: currentAttachments }),
       })
 
       if (!res.body) throw new Error('No stream')
@@ -214,8 +234,12 @@ Type **/** to see all available skills, or just ask me anything.`,
           </div>
         </header>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+        {/* Messages — drag & drop zone */}
+        <div
+          className="flex-1 overflow-y-auto px-4 py-6 space-y-5"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}
+        >
           {messages.map((msg) => (
             <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'items-start'}`}>
 
@@ -294,7 +318,47 @@ Type **/** to see all available skills, or just ask me anything.`,
 
         {/* Input */}
         <div className="border-t border-gray-200 bg-white px-4 py-3 flex-shrink-0">
+          {/* Attachment previews */}
+          {attachments.length > 0 && (
+            <div className="flex gap-2 mb-2 flex-wrap max-w-4xl mx-auto">
+              {attachments.map((att, i) => (
+                <div key={i} className="relative group">
+                  {att.preview ? (
+                    <img src={att.preview} alt={att.name} className="h-16 w-16 object-cover rounded-lg border border-gray-200" />
+                  ) : (
+                    <div className="h-16 w-28 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-500 px-2 text-center">{att.name}</div>
+                  )}
+                  <button
+                    onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gray-700 text-white rounded-full text-[10px] items-center justify-center hidden group-hover:flex"
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex gap-2 items-end max-w-4xl mx-auto">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py"
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+            {/* Attach file */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+              title="Attach image or file"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+
+            {/* Skills */}
             <button
               onClick={() => setShowSkills(!showSkills)}
               className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"

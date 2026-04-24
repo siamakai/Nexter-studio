@@ -47,7 +47,7 @@ Available skills the user can activate with slash commands:
 ${SKILLS.map((s) => `${s.trigger} — ${s.description}`).join('\n')}`
 
 export async function POST(req: NextRequest) {
-  const { message, history = [], workspaceRoot } = await req.json()
+  const { message, history = [], workspaceRoot, attachments = [] } = await req.json()
 
   if (workspaceRoot) process.env.WORKSPACE_ROOT = workspaceRoot
 
@@ -56,9 +56,28 @@ export async function POST(req: NextRequest) {
     ? `${BASE_SYSTEM}\n\n## Active Skill: ${skill.label}\n${skill.systemPrompt}`
     : BASE_SYSTEM
 
+  // Build user content — text + any image/file attachments
+  type ContentBlock =
+    | { type: 'text'; text: string }
+    | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
+
+  const userContent: ContentBlock[] = []
+  if (attachments.length > 0) {
+    for (const att of attachments as { name: string; type: string; data: string }[]) {
+      if (att.type.startsWith('image/')) {
+        userContent.push({ type: 'image', source: { type: 'base64', media_type: att.type, data: att.data } })
+      } else {
+        // Text file — decode and include as text
+        const text = Buffer.from(att.data, 'base64').toString('utf-8')
+        userContent.push({ type: 'text', text: `[File: ${att.name}]\n${text}` })
+      }
+    }
+  }
+  userContent.push({ type: 'text', text: cleanMessage || message })
+
   const messages: Anthropic.MessageParam[] = [
     ...history.slice(-20),
-    { role: 'user', content: cleanMessage || message },
+    { role: 'user', content: userContent.length === 1 && userContent[0].type === 'text' ? userContent[0].text : (userContent as Anthropic.MessageParam['content']) },
   ]
 
   // Stream the response using SSE
