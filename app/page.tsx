@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import FileTree from '@/components/FileTree'
 import { SKILLS } from '@/lib/skills'
@@ -31,8 +32,14 @@ const TOOL_ICONS: Record<string, string> = {
 }
 
 export default function StudioPage() {
+  const router = useRouter()
   type Attachment = { name: string; type: string; data: string; preview?: string }
   const [attachments, setAttachments] = useState<Attachment[]>([])
+
+  async function handleLogout() {
+    await fetch('/api/auth/login', { method: 'DELETE' })
+    router.push('/login')
+  }
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [messages, setMessages] = useState<Message[]>([
@@ -198,13 +205,8 @@ Type **/** to see all available skills, or just ask me anything.`,
             >
               📁
             </button>
-            <Image
-              src="/nexter-ai-group-logo.svg"
-              alt="Nexter AI Group"
-              width={120}
-              height={32}
-              priority
-            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/na-logo.svg" alt="Nexter AI Agency" style={{ width: 160, height: 'auto' }} />
           </div>
 
           <div className="flex items-center gap-3">
@@ -231,6 +233,13 @@ Type **/** to see all available skills, or just ask me anything.`,
               <div className="w-2 h-2 rounded-full bg-emerald-400" />
               <span className="text-xs text-gray-400">Online</span>
             </div>
+            <button
+              onClick={handleLogout}
+              className="text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors border border-gray-200"
+              title="Log out"
+            >
+              Log out
+            </button>
           </div>
         </header>
 

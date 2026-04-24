@@ -9,7 +9,10 @@ export function middleware(req: NextRequest) {
   if (
     PUBLIC_PATHS.some(p => pathname.startsWith(p)) ||
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/nexter-ai-group-logo')
+    pathname.startsWith('/nexter-ai-group-logo') ||
+    pathname.startsWith('/na-logo') ||
+    pathname.startsWith('/nexter-ai-agency-logo') ||
+    /\.(svg|png|jpg|jpeg|webp|ico|gif)$/.test(pathname)
   ) {
     return NextResponse.next()
   }

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 100" width="600" height="100">
+
+  <!-- Red square mark -->
+  <rect x="10" y="8" width="84" height="84" fill="#C0392B"/>
+
+  <!-- Inner white border frame -->
+  <rect x="17" y="15" width="70" height="70" fill="none" stroke="#ffffff" stroke-width="2"/>
+
+  <!-- White NA letterform inside red box -->
+  <text x="52" y="68" font-family="Georgia, serif" font-size="38" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="-1">NA</text>
+
+  <!-- NEXTER AI AGENCY wordmark — dark -->
+  <text x="122" y="52" font-family="Georgia, 'Times New Roman', serif" font-size="32" font-weight="700" fill="#0C0C0F" letter-spacing="2">NEXTER AI AGENCY</text>
+
+  <!-- Tagline in red -->
+  <text x="124" y="74" font-family="'Courier New', monospace" font-size="11" font-weight="400" fill="#C0392B" letter-spacing="3.5">AI IMPLEMENTATION · CHATBOTS · AUTOMATION</text>
+
+</svg>

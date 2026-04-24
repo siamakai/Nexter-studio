@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -37,13 +36,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <Image
-            src="/nexter-ai-group-logo.svg"
-            alt="Nexter AI Group"
-            width={200}
-            height={54}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/na-logo.svg"
+            alt="Nexter AI Agency"
+            style={{ width: 300, height: 'auto' }}
             className="mx-auto mb-6"
-            priority
           />
           <h1 className="text-xl font-semibold text-gray-900">Nexter Studio</h1>
           <p className="text-sm text-gray-500 mt-1">Enter your access code to continue</p>
