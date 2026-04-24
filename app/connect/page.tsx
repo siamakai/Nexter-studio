@@ -131,32 +131,24 @@ function ConnectContent() {
   return (
     <div className="text-center">
       <div className="text-4xl mb-4">🔗</div>
-      <h2 className="text-white text-xl font-semibold mb-2">Connect Google Account</h2>
+      <h2 className="text-white text-xl font-semibold mb-2">Connect an Account</h2>
       <p className="text-zinc-400 text-sm mb-6">
-        Allow Nexter Studio to access Gmail and Google Calendar.
+        Connect Gmail or Microsoft 365 to let the agent read email and manage your calendar.
       </p>
 
       {error && (
         <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 mb-5 text-left">
           <p className="text-red-400 text-xs font-mono break-all">{error}</p>
           <p className="text-zinc-500 text-xs mt-2">
-            If you see &quot;access_denied&quot; or &quot;This app hasn&apos;t been verified&quot;, use the manual token option below.
+            If you see &quot;access_denied&quot;, use the manual token option below.
           </p>
         </div>
       )}
 
-      <div className="bg-zinc-900 rounded-xl p-4 mb-6 text-left space-y-2">
-        <div className="flex items-center gap-2 text-sm text-zinc-300">
-          <span>📧</span><span>Read and send Gmail</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-zinc-300">
-          <span>📅</span><span>View and create Calendar events</span>
-        </div>
-      </div>
-
+      {/* Google */}
       <a
         href="/api/auth/connect"
-        className="flex items-center justify-center gap-3 w-full bg-white text-black py-3 rounded-lg font-medium hover:bg-zinc-100 transition mb-4"
+        className="flex items-center justify-center gap-3 w-full bg-white text-black py-3 rounded-lg font-medium hover:bg-zinc-100 transition mb-3"
       >
         <svg width="18" height="18" viewBox="0 0 18 18">
           <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
@@ -164,7 +156,21 @@ function ConnectContent() {
           <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
           <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
         </svg>
-        Continue with Google
+        Connect Google (Gmail + Calendar)
+      </a>
+
+      {/* Microsoft */}
+      <a
+        href="/api/auth/microsoft/connect"
+        className="flex items-center justify-center gap-3 w-full bg-[#0078d4] text-white py-3 rounded-lg font-medium hover:bg-[#106ebe] transition mb-4"
+      >
+        <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
+          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+        </svg>
+        Connect Microsoft 365 (Outlook + Calendar)
       </a>
 
       <button
