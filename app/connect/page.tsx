@@ -16,8 +16,30 @@ function ConnectContent() {
   const [manualEmail, setManualEmail] = useState('info@i-review.ai')
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState<string | null>(null)
-
   const [envKey, setEnvKey] = useState('')
+
+  const [calendlyKey, setCalendlyKey] = useState('')
+  const [calendlyStatus, setCalendlyStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
+  const [calendlyName, setCalendlyName] = useState('')
+
+  async function testCalendlyKey() {
+    if (!calendlyKey.trim()) return
+    setCalendlyStatus('testing')
+    try {
+      const res = await fetch('https://api.calendly.com/users/me', {
+        headers: { Authorization: `Bearer ${calendlyKey.trim()}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCalendlyName(data.resource?.name || 'Connected')
+        setCalendlyStatus('ok')
+      } else {
+        setCalendlyStatus('error')
+      }
+    } catch {
+      setCalendlyStatus('error')
+    }
+  }
 
   async function saveManualToken() {
     if (!refreshToken.trim()) return
@@ -214,6 +236,46 @@ function ConnectContent() {
         </svg>
         Connect Microsoft 365 (Outlook + Calendar)
       </a>
+
+      {/* Calendly */}
+      <div className="border border-zinc-700 rounded-xl p-4 mb-4 text-left">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg">📅</span>
+          <span className="text-white font-medium text-sm">Connect Calendly</span>
+          {calendlyStatus === 'ok' && <span className="text-emerald-400 text-xs ml-auto">✓ Valid</span>}
+        </div>
+        <p className="text-zinc-400 text-xs mb-3">
+          Get your Personal Access Token from{' '}
+          <a href="https://calendly.com/integrations/api_webhooks" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">
+            calendly.com → Integrations → API &amp; Webhooks
+          </a>
+        </p>
+        <input
+          type="text"
+          value={calendlyKey}
+          onChange={e => setCalendlyKey(e.target.value)}
+          placeholder="eyJhbGciOiJIUzI1NiJ9..."
+          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-zinc-500 mb-2"
+        />
+        {calendlyStatus === 'ok' && (
+          <div className="bg-zinc-900 rounded-lg p-3 mb-2">
+            <p className="text-zinc-400 text-xs mb-1">Connected as: <span className="text-white">{calendlyName}</span></p>
+            <p className="text-zinc-400 text-xs mb-1 font-mono">CALENDLY_API_KEY</p>
+            <p className="text-emerald-400 font-mono text-xs break-all select-all">{calendlyKey}</p>
+            <p className="text-zinc-500 text-xs mt-2">→ Add this to Vercel env vars and redeploy</p>
+          </div>
+        )}
+        {calendlyStatus === 'error' && (
+          <p className="text-red-400 text-xs mb-2">Invalid token. Check and try again.</p>
+        )}
+        <button
+          onClick={testCalendlyKey}
+          disabled={calendlyStatus === 'testing' || !calendlyKey.trim()}
+          className="w-full bg-zinc-700 hover:bg-zinc-600 text-white py-2 rounded-lg text-sm font-medium transition disabled:opacity-40"
+        >
+          {calendlyStatus === 'testing' ? 'Checking...' : 'Verify &amp; Show Env Var'}
+        </button>
+      </div>
 
       <button
         onClick={() => setShowManual(true)}
