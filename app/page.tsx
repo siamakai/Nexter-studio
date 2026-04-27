@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import MarkdownRenderer from '@/components/MarkdownRenderer'
 import FileTree from '@/components/FileTree'
@@ -35,12 +34,13 @@ export default function StudioPage() {
   const router = useRouter()
   type Attachment = { name: string; type: string; data: string; preview?: string }
   const [attachments, setAttachments] = useState<Attachment[]>([])
-
-  async function handleLogout() {
-    await fetch('/api/auth/login', { method: 'DELETE' })
-    router.push('/login')
-  }
+  const [showFiles, setShowFiles] = useState(false)
+  const [showSkills, setShowSkills] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [workspaceRoot, setWorkspaceRoot] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -60,11 +60,11 @@ Type **/** to see all available skills, or just ask me anything.`,
   ])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
-  const [showFiles, setShowFiles] = useState(false)
-  const [showSkills, setShowSkills] = useState(false)
-  const [workspaceRoot, setWorkspaceRoot] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  async function handleLogout() {
+    await fetch('/api/auth/login', { method: 'DELETE' })
+    router.push('/login')
+  }
 
   function handleFiles(files: FileList | null) {
     if (!files) return
@@ -72,7 +72,7 @@ Type **/** to see all available skills, or just ask me anything.`,
       const reader = new FileReader()
       reader.onload = (e) => {
         const result = e.target?.result as string
-        const data = result.split(',')[1] // strip data:...;base64,
+        const data = result.split(',')[1]
         const preview = file.type.startsWith('image/') ? result : undefined
         setAttachments((prev) => [...prev, { name: file.name, type: file.type, data, preview }])
       }
@@ -95,6 +95,7 @@ Type **/** to see all available skills, or just ask me anything.`,
     if (!msg || streaming) return
     setInput('')
     setShowSkills(false)
+    setShowMenu(false)
 
     const currentAttachments = [...attachments]
     setAttachments([])
@@ -180,44 +181,59 @@ Type **/** to see all available skills, or just ask me anything.`,
   function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
     if (e.key === '/' && input === '') setShowSkills(true)
-    if (e.key === 'Escape') setShowSkills(false)
+    if (e.key === 'Escape') { setShowSkills(false); setShowMenu(false) }
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* File Tree Sidebar */}
+    // h-dvh fixes iOS address bar collapsing viewport
+    <div className="flex h-dvh overflow-hidden bg-gray-50">
+
+      {/* File Tree Sidebar — overlay on mobile, sidebar on desktop */}
       {showFiles && (
-        <aside className="w-56 border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden flex flex-col shadow-sm">
-          <FileTree onPathSelect={insertPath} />
-        </aside>
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-20 md:hidden"
+            onClick={() => setShowFiles(false)}
+          />
+          <aside className="fixed left-0 top-0 bottom-0 z-30 w-64 md:relative md:z-auto md:w-56 border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden flex flex-col shadow-sm">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 md:hidden">
+              <span className="text-sm font-medium text-gray-700">Files</span>
+              <button onClick={() => setShowFiles(false)} className="text-gray-400 p-1">✕</button>
+            </div>
+            <FileTree onPathSelect={insertPath} />
+          </aside>
+        </>
       )}
 
       {/* Main Chat */}
       <div className="flex flex-col flex-1 min-w-0">
 
         {/* Header */}
-        <header className="border-b border-gray-200 bg-white px-4 py-2.5 flex items-center justify-between flex-shrink-0 shadow-sm">
-          <div className="flex items-center gap-3">
+        <header className="border-b border-gray-200 bg-white px-3 md:px-4 py-2.5 flex items-center justify-between flex-shrink-0 shadow-sm">
+          {/* Left: file toggle + logo */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setShowFiles(!showFiles)}
-              className={`p-1.5 rounded text-sm transition-colors ${showFiles ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`p-2 rounded-lg text-sm transition-colors ${showFiles ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600'}`}
               title="Toggle file browser"
             >
               📁
             </button>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/na-logo.svg" alt="Nexter AI Agency" style={{ width: 160, height: 'auto' }} />
+            <img src="/na-logo.svg" alt="Nexter AI Agency" className="w-24 md:w-40 h-auto" />
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Right: desktop controls + mobile menu button */}
+          <div className="flex items-center gap-2">
+            {/* Desktop only */}
             <input
               type="text"
               value={workspaceRoot}
               onChange={(e) => setWorkspaceRoot(e.target.value)}
-              placeholder="Workspace path (optional)"
-              className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-500 w-44 focus:outline-none focus:border-gray-400"
+              placeholder="Workspace path"
+              className="hidden md:block text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-500 w-40 focus:outline-none focus:border-gray-400"
             />
-            <div className="flex gap-1">
+            <div className="hidden md:flex gap-1">
               {SKILLS.slice(0, 4).map((s) => (
                 <button
                   key={s.trigger}
@@ -229,28 +245,73 @@ Type **/** to see all available skills, or just ask me anything.`,
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="hidden md:flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-emerald-400" />
               <span className="text-xs text-gray-400">Online</span>
             </div>
             <button
               onClick={handleLogout}
-              className="text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors border border-gray-200"
-              title="Log out"
+              className="hidden md:block text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors border border-gray-200"
             >
               Log out
+            </button>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round"/>
+              </svg>
             </button>
           </div>
         </header>
 
-        {/* Messages — drag & drop zone */}
+        {/* Mobile dropdown menu */}
+        {showMenu && (
+          <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3 space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-xs text-gray-500">Online</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-sm text-red-500 hover:text-red-700 font-medium"
+              >
+                Log out
+              </button>
+            </div>
+            <input
+              type="text"
+              value={workspaceRoot}
+              onChange={(e) => setWorkspaceRoot(e.target.value)}
+              placeholder="Workspace path (optional)"
+              className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:border-gray-400"
+            />
+            <div className="flex flex-wrap gap-2">
+              {SKILLS.slice(0, 6).map((s) => (
+                <button
+                  key={s.trigger}
+                  onClick={() => { setInput(s.trigger + ' '); setShowMenu(false); inputRef.current?.focus() }}
+                  className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full transition-colors"
+                >
+                  {s.icon} {s.trigger}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Messages */}
         <div
-          className="flex-1 overflow-y-auto px-4 py-6 space-y-5"
+          className="flex-1 overflow-y-auto px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-5"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}
         >
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'items-start'}`}>
+            <div key={msg.id} className={`flex gap-2 md:gap-3 ${msg.role === 'user' ? 'justify-end' : 'items-start'}`}>
 
               {msg.role === 'assistant' && (
                 <div className="w-7 h-7 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white mt-0.5">
@@ -258,7 +319,7 @@ Type **/** to see all available skills, or just ask me anything.`,
                 </div>
               )}
 
-              <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end max-w-[80%]' : 'flex-1 min-w-0 max-w-3xl'}`}>
+              <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end max-w-[88%] md:max-w-[80%]' : 'flex-1 min-w-0 max-w-full md:max-w-3xl'}`}>
                 {msg.skill && (
                   <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full self-start">
                     {msg.skill.icon} {msg.skill.label}
@@ -278,11 +339,11 @@ Type **/** to see all available skills, or just ask me anything.`,
                 )}
 
                 {msg.role === 'user' ? (
-                  <div className="bg-gray-900 text-white px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed whitespace-pre-wrap">
+                  <div className="bg-gray-900 text-white px-3.5 py-2.5 md:px-4 rounded-2xl rounded-tr-sm text-sm leading-relaxed whitespace-pre-wrap">
                     {msg.content}
                   </div>
                 ) : (
-                  <div className="min-w-0 bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100">
+                  <div className="min-w-0 bg-white rounded-2xl rounded-tl-sm px-3.5 py-3 md:px-4 shadow-sm border border-gray-100 text-sm">
                     {msg.content ? (
                       <MarkdownRenderer content={msg.content} />
                     ) : msg.streaming ? (
@@ -308,46 +369,46 @@ Type **/** to see all available skills, or just ask me anything.`,
 
         {/* Skills popup */}
         {showSkills && (
-          <div className="mx-4 mb-2 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-lg">
+          <div className="mx-3 md:mx-4 mb-2 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-lg max-h-64 overflow-y-auto">
             {SKILLS.map((s) => (
               <button
                 key={s.trigger}
                 onClick={() => { setInput(s.trigger + ' '); setShowSkills(false); inputRef.current?.focus() }}
-                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-100 last:border-0"
+                className="w-full text-left px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-3 border-b border-gray-100 last:border-0"
               >
-                <span className="text-lg">{s.icon}</span>
+                <span className="text-xl">{s.icon}</span>
                 <div>
                   <span className="text-sm font-medium text-gray-900">{s.trigger}</span>
-                  <span className="text-xs text-gray-400 ml-2">{s.description}</span>
+                  <span className="text-xs text-gray-400 ml-2 hidden sm:inline">{s.description}</span>
                 </div>
               </button>
             ))}
           </div>
         )}
 
-        {/* Input */}
-        <div className="border-t border-gray-200 bg-white px-4 py-3 flex-shrink-0">
+        {/* Input — pb accounts for iOS safe area (home bar) */}
+        <div className="border-t border-gray-200 bg-white px-3 md:px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex-shrink-0">
           {/* Attachment previews */}
           {attachments.length > 0 && (
-            <div className="flex gap-2 mb-2 flex-wrap max-w-4xl mx-auto">
+            <div className="flex gap-2 mb-2 flex-wrap">
               {attachments.map((att, i) => (
-                <div key={i} className="relative group">
+                <div key={i} className="relative">
                   {att.preview ? (
-                    <img src={att.preview} alt={att.name} className="h-16 w-16 object-cover rounded-lg border border-gray-200" />
+                    <img src={att.preview} alt={att.name} className="h-14 w-14 md:h-16 md:w-16 object-cover rounded-lg border border-gray-200" />
                   ) : (
-                    <div className="h-16 w-28 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-500 px-2 text-center">{att.name}</div>
+                    <div className="h-14 w-24 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-500 px-2 text-center">{att.name}</div>
                   )}
+                  {/* Always visible on mobile (no hover) */}
                   <button
                     onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}
-                    className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gray-700 text-white rounded-full text-[10px] items-center justify-center hidden group-hover:flex"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-700 text-white rounded-full text-xs flex items-center justify-center"
                   >×</button>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="flex gap-2 items-end max-w-4xl mx-auto">
-            {/* Hidden file input */}
+          <div className="flex gap-2 items-end">
             <input
               ref={fileInputRef}
               type="file"
@@ -356,13 +417,13 @@ Type **/** to see all available skills, or just ask me anything.`,
               className="hidden"
               onChange={(e) => handleFiles(e.target.files)}
             />
-            {/* Attach file */}
+            {/* Attach */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-              title="Attach image or file"
+              className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 active:bg-gray-200 rounded-xl transition-colors flex-shrink-0"
+              title="Attach file"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
@@ -370,13 +431,14 @@ Type **/** to see all available skills, or just ask me anything.`,
             {/* Skills */}
             <button
               onClick={() => setShowSkills(!showSkills)}
-              className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-              title="Skills (or type /)"
+              className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 active:bg-gray-200 rounded-xl transition-colors flex-shrink-0"
+              title="Skills"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <circle cx="12" cy="12" r="10" /><path d="M12 8v4m0 4h.01" />
               </svg>
             </button>
+
             <textarea
               ref={inputRef}
               value={input}
@@ -387,33 +449,36 @@ Type **/** to see all available skills, or just ask me anything.`,
               }}
               onKeyDown={handleKey}
               disabled={streaming}
-              placeholder={streaming ? 'Working...' : 'Ask anything — read email, check calendar, search CRM...'}
+              placeholder={streaming ? 'Working...' : 'Ask anything…'}
               rows={1}
               style={{ maxHeight: '120px', resize: 'none' }}
-              className="flex-1 bg-gray-50 border border-gray-200 focus:border-gray-400 rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-colors disabled:opacity-50"
+              className="flex-1 bg-gray-50 border border-gray-200 focus:border-gray-400 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-colors disabled:opacity-50"
               onInput={(e) => {
                 const el = e.currentTarget
                 el.style.height = 'auto'
                 el.style.height = Math.min(el.scrollHeight, 120) + 'px'
               }}
             />
+
             <button
               onClick={() => send()}
               disabled={streaming || !input.trim()}
-              className="p-2.5 bg-gray-900 hover:bg-gray-700 disabled:opacity-30 text-white rounded-xl transition-colors flex-shrink-0"
+              className="p-2.5 bg-gray-900 hover:bg-gray-700 active:bg-gray-600 disabled:opacity-30 text-white rounded-xl transition-colors flex-shrink-0"
             >
               {streaming ? (
-                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
             </button>
           </div>
-          <p className="text-[10px] text-gray-400 mt-1.5 text-center">Enter to send · Shift+Enter for new line · / for skills</p>
+          <p className="hidden md:block text-[10px] text-gray-400 mt-1.5 text-center">
+            Enter to send · Shift+Enter for new line · / for skills
+          </p>
         </div>
       </div>
     </div>
