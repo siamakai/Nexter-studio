@@ -107,7 +107,9 @@ Set should_create to false ONLY if: auto-reply, out-of-office, newsletter, spam,
     messages: [{ role: 'user', content: prompt }],
   })
 
-  const text = (response.content[0] as { type: string; text: string }).text.trim()
+  const raw = (response.content[0] as { type: string; text: string }).text.trim()
+  // Strip markdown code fences if present
+  const text = raw.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim()
   return JSON.parse(text) as LeadAnalysis
 }
 
