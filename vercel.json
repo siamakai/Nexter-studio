@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/meeting-prep",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/meet-transcripts",
+      "schedule": "0 10 * * *"
     }
   ]
 }
