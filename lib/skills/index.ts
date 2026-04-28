@@ -119,12 +119,13 @@ Be direct. No filler. Think like a sharp EA.`,
 
 Do this:
 1. Use ghl_stale_contacts with days=3 to find hot/warm contacts not updated recently
-2. For each stale contact, use ghl_get_contact to get their full details
-3. Draft a short, personalised follow-up email for each one — warm, professional, with a clear next step
-4. Ask which ones to send, and use gmail_send_email to send the approved ones
-5. After sending, use ghl_add_note to log the follow-up on each contact
+2. For each stale contact, use ghl_get_contact to get their full details and CRM notes
+3. Use zoom_get_meeting_summary with their name as the search term to check if there's a past meeting record
+4. Draft a short, personalised follow-up email for each — reference what was discussed last time if a meeting summary exists
+5. Ask which ones to send, then use gmail_send_email to send the approved ones
+6. After sending, use ghl_add_note to log "Follow-up sent [date]" on each contact
 
-Present the follow-ups as a list with the draft message for each. Be human, not salesy.`,
+The follow-up should feel like it's from someone who remembers the conversation — not a generic check-in. Reference specific things from past meetings or emails where possible.`,
   },
   {
     trigger: '/pipeline',
@@ -157,18 +158,20 @@ Be specific. Name names. Give numbers.`,
 Do this:
 1. Use calendar_list_events with days_ahead=1 to find today's meetings
 2. Ask which meeting to prep for (or take the next one chronologically)
-3. For each attendee email, use ghl_search_contacts to find their CRM profile
-4. Use gmail_read_inbox with query "from:[attendee email]" to find recent email history
-5. Summarise everything into a clean briefing card
+3. For each attendee, use ghl_search_contacts to find their CRM profile and notes
+4. Use zoom_get_meeting_summary with their name or company as the search term to find past meeting summaries
+5. Use gmail_read_inbox with query "from:[attendee email]" to find recent email history
+6. Combine everything into a briefing card
 
 Format:
 - WHO: name, company, role, tags from CRM
-- HISTORY: last email thread, last meeting, any notes
-- CONTEXT: what they want, where the relationship stands
+- LAST MEETING: date, what was discussed, what was agreed (from Zoom summary if available)
+- EMAIL HISTORY: recent thread topics and tone
+- CONTEXT: where the relationship stands, what they want
 - GOAL: what Siamak should aim to achieve in this meeting
-- WATCH OUT: any red flags or sensitivities
+- WATCH OUT: unresolved action items from last call, any red flags
 
-Keep it to one page. Be sharp.`,
+Keep it to one page. Be sharp and specific — name exact past discussions if the data is there.`,
   },
   {
     trigger: '/inbox',
