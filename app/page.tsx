@@ -8,27 +8,30 @@ import { SKILLS } from '@/lib/skills'
 
 type ToolEvent = { type: 'tool_start' | 'tool_result'; tool: string; result?: string }
 type SkillEvent = { type: 'skill'; skill: { trigger: string; label: string; icon: string } }
-
 type Message = {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  tools?: ToolEvent[]
-  skill?: { trigger: string; label: string; icon: string }
-  streaming?: boolean
+  id: string; role: 'user' | 'assistant'; content: string
+  tools?: ToolEvent[]; skill?: { trigger: string; label: string; icon: string }; streaming?: boolean
 }
 
 const TOOL_ICONS: Record<string, string> = {
-  read_file: '📖', write_file: '✏️', list_directory: '📁',
-  search_files: '🔍', create_directory: '📁', delete_file: '🗑️',
-  move_file: '🚚', run_command: '⚡', save_memory: '🧠',
-  recall_memory: '🧠', list_memories: '🧠', web_fetch: '🌐',
+  read_file: '📖', write_file: '✏️', list_directory: '📁', search_files: '🔍',
+  create_directory: '📁', delete_file: '🗑️', move_file: '🚚', run_command: '⚡',
+  save_memory: '🧠', recall_memory: '🧠', list_memories: '🧠', web_fetch: '🌐',
   gmail_read_inbox: '📧', gmail_send_email: '📤', gmail_get_email: '📧',
   calendar_list_events: '📅', calendar_create_event: '📅',
   ms_read_inbox: '📧', ms_send_email: '📤', ms_list_calendar: '📅',
   ghl_create_contact: '👤', ghl_search_contacts: '🔍', ghl_add_note: '📝',
   zoom_create_meeting: '📹', calendly_list_events: '📅',
 }
+
+const gold = '#B8963E'
+const goldLt = '#D4AF6A'
+const ink = '#08080D'
+const surface = '#111118'
+const surface2 = '#1A1A24'
+const border = 'rgba(184,150,62,0.2)'
+const cream = '#F8F4EE'
+const muted = 'rgba(248,244,238,0.45)'
 
 export default function StudioPage() {
   const router = useRouter()
@@ -42,22 +45,21 @@ export default function StudioPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'assistant',
-      content: `Hi! I'm your Nexter AI assistant. I have access to your email, calendar, CRM, and more.
+  const [messages, setMessages] = useState<Message[]>([{
+    id: '0', role: 'assistant',
+    content: `Welcome. I'm your Nexter AI assistant — connected to your email, calendar, CRM, and more.
 
 **What I can do:**
 - 📧 Read and send email (Gmail & Outlook)
 - 📅 Check and create calendar events
 - 👤 Search and manage GHL contacts
+- 📹 Create Zoom meetings
+- 📅 View Calendly bookings
 - 📁 Read and write files
 - 🌐 Browse the web
 
 Type **/** to see all available skills, or just ask me anything.`,
-    },
-  ])
+  }])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
 
@@ -80,9 +82,7 @@ Type **/** to see all available skills, or just ask me anything.`,
     })
   }
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   const insertPath = useCallback((path: string) => {
     setInput((prev) => prev + path + ' ')
@@ -93,85 +93,45 @@ Type **/** to see all available skills, or just ask me anything.`,
   async function send(text?: string) {
     const msg = (text ?? input).trim()
     if (!msg || streaming) return
-    setInput('')
-    setShowSkills(false)
-    setShowMenu(false)
-
-    const currentAttachments = [...attachments]
-    setAttachments([])
+    setInput(''); setShowSkills(false); setShowMenu(false)
+    const currentAttachments = [...attachments]; setAttachments([])
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: msg }
     const assistantId = (Date.now() + 1).toString()
     const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', tools: [], streaming: true }
-
     setMessages((prev) => [...prev, userMsg, assistantMsg])
     setStreaming(true)
-
     try {
-      const history = messages
-        .filter((m) => !m.streaming)
-        .slice(-20)
-        .map((m) => ({ role: m.role, content: m.content || '...' }))
-
+      const history = messages.filter((m) => !m.streaming).slice(-20).map((m) => ({ role: m.role, content: m.content || '...' }))
       const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: msg, history, workspaceRoot, attachments: currentAttachments }),
       })
-
       if (!res.body) throw new Error('No stream')
-
-      const reader = res.body.getReader()
-      const dec = new TextDecoder()
-      let buffer = ''
-
+      const reader = res.body.getReader(); const dec = new TextDecoder(); let buffer = ''
       while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+        const { done, value } = await reader.read(); if (done) break
         buffer += dec.decode(value, { stream: true })
-
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
+        const lines = buffer.split('\n'); buffer = lines.pop() || ''
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           try {
             const event = JSON.parse(line.slice(6))
             if (event.type === 'text_delta') {
-              setMessages((prev) =>
-                prev.map((m) => m.id === assistantId ? { ...m, content: m.content + event.text } : m)
-              )
+              setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content + event.text } : m))
             } else if (event.type === 'tool_start') {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? { ...m, tools: [...(m.tools || []), { type: 'tool_start', tool: event.tool }] }
-                    : m
-                )
-              )
+              setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, tools: [...(m.tools || []), { type: 'tool_start', tool: event.tool }] } : m))
             } else if (event.type === 'tool_result') {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? { ...m, tools: [...(m.tools || []), { type: 'tool_result', tool: event.tool, result: event.result }] }
-                    : m
-                )
-              )
+              setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, tools: [...(m.tools || []), { type: 'tool_result', tool: event.tool, result: event.result }] } : m))
             } else if (event.type === 'skill') {
-              setMessages((prev) =>
-                prev.map((m) => m.id === assistantId ? { ...m, skill: (event as SkillEvent).skill } : m)
-              )
+              setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, skill: (event as SkillEvent).skill } : m))
             } else if (event.type === 'error') {
-              setMessages((prev) =>
-                prev.map((m) => m.id === assistantId ? { ...m, content: m.content || `Error: ${event.message}` } : m)
-              )
+              setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content || `Error: ${event.message}` } : m))
             }
-          } catch { /* skip malformed */ }
+          } catch { /* skip */ }
         }
       }
     } catch (err) {
-      setMessages((prev) =>
-        prev.map((m) => m.id === assistantId ? { ...m, content: `Connection error: ${String(err)}` } : m)
-      )
+      setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: `Connection error: ${String(err)}` } : m))
     } finally {
       setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false } : m))
       setStreaming(false)
@@ -185,118 +145,74 @@ Type **/** to see all available skills, or just ask me anything.`,
   }
 
   return (
-    // h-dvh fixes iOS address bar collapsing viewport
-    <div className="flex h-dvh overflow-hidden bg-gray-50">
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: ink }}>
 
-      {/* File Tree Sidebar — overlay on mobile, sidebar on desktop */}
+      {/* Sidebar overlay on mobile */}
       {showFiles && (
         <>
-          <div
-            className="fixed inset-0 bg-black/30 z-20 md:hidden"
-            onClick={() => setShowFiles(false)}
-          />
-          <aside className="fixed left-0 top-0 bottom-0 z-30 w-64 md:relative md:z-auto md:w-56 border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden flex flex-col shadow-sm">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 md:hidden">
-              <span className="text-sm font-medium text-gray-700">Files</span>
-              <button onClick={() => setShowFiles(false)} className="text-gray-400 p-1">✕</button>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 20 }} className="md:hidden" onClick={() => setShowFiles(false)} />
+          <aside style={{ position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 30, width: 240, background: surface, borderRight: `1px solid ${border}`, display: 'flex', flexDirection: 'column' }} className="md:relative md:z-auto">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${border}` }}>
+              <span style={{ fontSize: 11, letterSpacing: '0.12em', color: muted, fontFamily: 'Courier New, monospace', textTransform: 'uppercase' }}>Files</span>
+              <button onClick={() => setShowFiles(false)} style={{ background: 'none', border: 'none', color: muted, cursor: 'pointer', fontSize: 16 }}>✕</button>
             </div>
             <FileTree onPathSelect={insertPath} />
           </aside>
         </>
       )}
 
-      {/* Main Chat */}
-      <div className="flex flex-col flex-1 min-w-0">
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
 
         {/* Header */}
-        <header className="border-b border-gray-200 bg-white px-3 md:px-4 py-2.5 flex items-center justify-between flex-shrink-0 shadow-sm">
-          {/* Left: file toggle + logo */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowFiles(!showFiles)}
-              className={`p-2 rounded-lg text-sm transition-colors ${showFiles ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600'}`}
-              title="Toggle file browser"
-            >
+        <header style={{ borderBottom: `1px solid ${border}`, background: surface, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={() => setShowFiles(!showFiles)} style={{ background: showFiles ? 'rgba(184,150,62,0.15)' : 'none', border: 'none', borderRadius: 6, padding: 6, cursor: 'pointer', color: showFiles ? gold : muted, fontSize: 14 }}>
               📁
             </button>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/na-logo.svg" alt="Nexter AI Agency" className="w-24 md:w-40 h-auto" />
+            <img src="/nexter-group-logo.svg" alt="Nexter AI Group" style={{ height: 32, width: 'auto' }} />
           </div>
 
-          {/* Right: desktop controls + mobile menu button */}
-          <div className="flex items-center gap-2">
-            {/* Desktop only */}
-            <input
-              type="text"
-              value={workspaceRoot}
-              onChange={(e) => setWorkspaceRoot(e.target.value)}
-              placeholder="Workspace path"
-              className="hidden md:block text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-500 w-40 focus:outline-none focus:border-gray-400"
-            />
-            <div className="hidden md:flex gap-1">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Desktop */}
+            <input type="text" value={workspaceRoot} onChange={(e) => setWorkspaceRoot(e.target.value)} placeholder="Workspace path" className="hidden md:block" style={{ fontSize: 11, background: ink, border: `1px solid ${border}`, borderRadius: 6, padding: '4px 10px', color: muted, width: 160, outline: 'none', fontFamily: 'Courier New, monospace' }} />
+            <div className="hidden md:flex" style={{ gap: 4 }}>
               {SKILLS.slice(0, 4).map((s) => (
-                <button
-                  key={s.trigger}
-                  onClick={() => { setInput(s.trigger + ' '); inputRef.current?.focus() }}
-                  title={s.label}
-                  className="p-1.5 rounded text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                >
+                <button key={s.trigger} onClick={() => { setInput(s.trigger + ' '); inputRef.current?.focus() }} title={s.label} style={{ background: 'none', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', color: muted, fontSize: 14, transition: 'color 0.15s' }}>
                   {s.icon}
                 </button>
               ))}
             </div>
-            <div className="hidden md:flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-xs text-gray-400">Online</span>
+            <div className="hidden md:flex" style={{ alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#2A7D4F' }} />
+              <span style={{ fontSize: 11, color: muted, fontFamily: 'Courier New, monospace' }}>Online</span>
             </div>
-            <button
-              onClick={handleLogout}
-              className="hidden md:block text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors border border-gray-200"
-            >
+            <button onClick={handleLogout} className="hidden md:block" style={{ fontSize: 11, color: muted, background: 'none', border: `1px solid ${border}`, borderRadius: 8, padding: '4px 12px', cursor: 'pointer', fontFamily: 'Courier New, monospace', letterSpacing: '0.08em', transition: 'color 0.15s' }}>
               Log out
             </button>
-
-            {/* Mobile menu button */}
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            {/* Mobile menu */}
+            <button onClick={() => setShowMenu(!showMenu)} className="md:hidden" style={{ background: 'none', border: 'none', color: muted, cursor: 'pointer', padding: 6 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round"/>
               </svg>
             </button>
           </div>
         </header>
 
-        {/* Mobile dropdown menu */}
+        {/* Mobile dropdown */}
         {showMenu && (
-          <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3 space-y-3 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-xs text-gray-500">Online</span>
+          <div className="md:hidden" style={{ background: surface, borderBottom: `1px solid ${border}`, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#2A7D4F' }} />
+                <span style={{ fontSize: 11, color: muted, fontFamily: 'Courier New, monospace' }}>Online</span>
               </div>
-              <button
-                onClick={handleLogout}
-                className="text-sm text-red-500 hover:text-red-700 font-medium"
-              >
-                Log out
-              </button>
+              <button onClick={handleLogout} style={{ fontSize: 12, color: '#C0392B', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Courier New, monospace' }}>Log out</button>
             </div>
-            <input
-              type="text"
-              value={workspaceRoot}
-              onChange={(e) => setWorkspaceRoot(e.target.value)}
-              placeholder="Workspace path (optional)"
-              className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:border-gray-400"
-            />
-            <div className="flex flex-wrap gap-2">
+            <input type="text" value={workspaceRoot} onChange={(e) => setWorkspaceRoot(e.target.value)} placeholder="Workspace path (optional)" style={{ fontSize: 11, background: ink, border: `1px solid ${border}`, borderRadius: 8, padding: '8px 12px', color: cream, outline: 'none', fontFamily: 'Courier New, monospace', width: '100%', boxSizing: 'border-box' }} />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {SKILLS.slice(0, 6).map((s) => (
-                <button
-                  key={s.trigger}
-                  onClick={() => { setInput(s.trigger + ' '); setShowMenu(false); inputRef.current?.focus() }}
-                  className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full transition-colors"
-                >
+                <button key={s.trigger} onClick={() => { setInput(s.trigger + ' '); setShowMenu(false); inputRef.current?.focus() }} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, background: 'rgba(184,150,62,0.1)', border: `1px solid ${border}`, borderRadius: 20, padding: '5px 12px', color: goldLt, cursor: 'pointer', fontFamily: 'Courier New, monospace' }}>
                   {s.icon} {s.trigger}
                 </button>
               ))}
@@ -305,52 +221,42 @@ Type **/** to see all available skills, or just ask me anything.`,
         )}
 
         {/* Messages */}
-        <div
-          className="flex-1 overflow-y-auto px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-5"
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 20 }}
           onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}
-        >
+          onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}>
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-2 md:gap-3 ${msg.role === 'user' ? 'justify-end' : 'items-start'}`}>
+            <div key={msg.id} style={{ display: 'flex', gap: 12, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start' }}>
 
               {msg.role === 'assistant' && (
-                <div className="w-7 h-7 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white mt-0.5">
-                  N
-                </div>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', background: gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700, color: ink, fontFamily: 'Georgia, serif', marginTop: 2 }}>N</div>
               )}
 
-              <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end max-w-[88%] md:max-w-[80%]' : 'flex-1 min-w-0 max-w-full md:max-w-3xl'}`}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: msg.role === 'user' ? 'min(88%, 520px)' : 'min(100%, 720px)', minWidth: 0 }}>
                 {msg.skill && (
-                  <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full self-start">
+                  <span style={{ fontSize: 11, color: goldLt, background: 'rgba(184,150,62,0.1)', border: `1px solid ${border}`, padding: '2px 10px', borderRadius: 20, alignSelf: 'flex-start', fontFamily: 'Courier New, monospace', letterSpacing: '0.08em' }}>
                     {msg.skill.icon} {msg.skill.label}
                   </span>
                 )}
-
-                {msg.tools && msg.tools.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {msg.tools
-                      .filter((t) => t.type === 'tool_start')
-                      .map((t, i) => (
-                        <span key={i} className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5 rounded font-mono">
-                          {TOOL_ICONS[t.tool] || '🔧'} {t.tool}
-                        </span>
-                      ))}
+                {msg.tools && msg.tools.filter(t => t.type === 'tool_start').length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {msg.tools.filter(t => t.type === 'tool_start').map((t, i) => (
+                      <span key={i} style={{ fontSize: 11, background: 'rgba(184,150,62,0.08)', border: `1px solid ${border}`, color: muted, padding: '2px 8px', borderRadius: 4, fontFamily: 'Courier New, monospace' }}>
+                        {TOOL_ICONS[t.tool] || '🔧'} {t.tool}
+                      </span>
+                    ))}
                   </div>
                 )}
-
                 {msg.role === 'user' ? (
-                  <div className="bg-gray-900 text-white px-3.5 py-2.5 md:px-4 rounded-2xl rounded-tr-sm text-sm leading-relaxed whitespace-pre-wrap">
+                  <div style={{ background: surface2, border: `1px solid ${border}`, padding: '10px 16px', borderRadius: 16, borderTopRightRadius: 4, fontSize: 14, lineHeight: 1.6, color: cream, whiteSpace: 'pre-wrap', fontFamily: 'Georgia, serif' }}>
                     {msg.content}
                   </div>
                 ) : (
-                  <div className="min-w-0 bg-white rounded-2xl rounded-tl-sm px-3.5 py-3 md:px-4 shadow-sm border border-gray-100 text-sm">
-                    {msg.content ? (
-                      <MarkdownRenderer content={msg.content} />
-                    ) : msg.streaming ? (
-                      <div className="flex gap-1 py-1">
-                        <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:0ms]" />
-                        <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:150ms]" />
-                        <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:300ms]" />
+                  <div style={{ background: surface, border: `1px solid ${border}`, padding: '14px 18px', borderRadius: 16, borderTopLeftRadius: 4 }}>
+                    {msg.content ? <MarkdownRenderer content={msg.content} /> : msg.streaming ? (
+                      <div style={{ display: 'flex', gap: 5, padding: '4px 0' }}>
+                        {[0, 150, 300].map((d) => (
+                          <span key={d} style={{ width: 6, height: 6, borderRadius: '50%', background: gold, display: 'inline-block', animation: 'bounce 1s infinite', animationDelay: `${d}ms` }} />
+                        ))}
                       </div>
                     ) : null}
                   </div>
@@ -358,9 +264,7 @@ Type **/** to see all available skills, or just ask me anything.`,
               </div>
 
               {msg.role === 'user' && (
-                <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 text-xs font-bold text-gray-600 mt-0.5">
-                  S
-                </div>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', background: surface2, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700, color: goldLt, fontFamily: 'Georgia, serif', marginTop: 2 }}>S</div>
               )}
             </div>
           ))}
@@ -369,118 +273,80 @@ Type **/** to see all available skills, or just ask me anything.`,
 
         {/* Skills popup */}
         {showSkills && (
-          <div className="mx-3 md:mx-4 mb-2 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-lg max-h-64 overflow-y-auto">
+          <div style={{ margin: '0 16px 8px', background: surface, border: `1px solid ${border}`, borderRadius: 12, overflow: 'hidden', maxHeight: 280, overflowY: 'auto' }}>
             {SKILLS.map((s) => (
-              <button
-                key={s.trigger}
-                onClick={() => { setInput(s.trigger + ' '); setShowSkills(false); inputRef.current?.focus() }}
-                className="w-full text-left px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-3 border-b border-gray-100 last:border-0"
-              >
-                <span className="text-xl">{s.icon}</span>
+              <button key={s.trigger} onClick={() => { setInput(s.trigger + ' '); setShowSkills(false); inputRef.current?.focus() }}
+                style={{ width: '100%', textAlign: 'left', padding: '11px 16px', background: 'none', border: 'none', borderBottom: `1px solid ${border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, transition: 'background 0.15s', color: cream }}>
+                <span style={{ fontSize: 18 }}>{s.icon}</span>
                 <div>
-                  <span className="text-sm font-medium text-gray-900">{s.trigger}</span>
-                  <span className="text-xs text-gray-400 ml-2 hidden sm:inline">{s.description}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: goldLt, fontFamily: 'Courier New, monospace' }}>{s.trigger}</span>
+                  <span style={{ fontSize: 11, color: muted, marginLeft: 8 }} className="hidden sm:inline">{s.description}</span>
                 </div>
               </button>
             ))}
           </div>
         )}
 
-        {/* Input — pb accounts for iOS safe area (home bar) */}
-        <div className="border-t border-gray-200 bg-white px-3 md:px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex-shrink-0">
-          {/* Attachment previews */}
+        {/* Input */}
+        <div style={{ borderTop: `1px solid ${border}`, background: surface, padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))', flexShrink: 0 }}>
           {attachments.length > 0 && (
-            <div className="flex gap-2 mb-2 flex-wrap">
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
               {attachments.map((att, i) => (
-                <div key={i} className="relative">
-                  {att.preview ? (
-                    <img src={att.preview} alt={att.name} className="h-14 w-14 md:h-16 md:w-16 object-cover rounded-lg border border-gray-200" />
-                  ) : (
-                    <div className="h-14 w-24 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-500 px-2 text-center">{att.name}</div>
-                  )}
-                  {/* Always visible on mobile (no hover) */}
-                  <button
-                    onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-700 text-white rounded-full text-xs flex items-center justify-center"
-                  >×</button>
+                <div key={i} style={{ position: 'relative' }}>
+                  {att.preview
+                    ? <img src={att.preview} alt={att.name} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: `1px solid ${border}` }} />
+                    : <div style={{ width: 96, height: 56, background: ink, border: `1px solid ${border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: muted, padding: '0 6px', textAlign: 'center', fontFamily: 'Courier New, monospace' }}>{att.name}</div>
+                  }
+                  <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, background: gold, border: 'none', borderRadius: '50%', color: ink, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>×</button>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="flex gap-2 items-end">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,.pdf,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py"
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-            {/* Attach */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 active:bg-gray-200 rounded-xl transition-colors flex-shrink-0"
-              title="Attach file"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py" style={{ display: 'none' }} onChange={(e) => handleFiles(e.target.files)} />
+            <button onClick={() => fileInputRef.current?.click()} title="Attach file" style={{ background: 'none', border: `1px solid ${border}`, borderRadius: 10, padding: 10, cursor: 'pointer', color: muted, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-
-            {/* Skills */}
-            <button
-              onClick={() => setShowSkills(!showSkills)}
-              className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 active:bg-gray-200 rounded-xl transition-colors flex-shrink-0"
-              title="Skills"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx="12" cy="12" r="10" /><path d="M12 8v4m0 4h.01" />
+            <button onClick={() => setShowSkills(!showSkills)} title="Skills" style={{ background: 'none', border: `1px solid ${border}`, borderRadius: 10, padding: 10, cursor: 'pointer', color: showSkills ? gold : muted, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
               </svg>
             </button>
-
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value)
-                if (e.target.value === '/') setShowSkills(true)
-                else if (!e.target.value.startsWith('/')) setShowSkills(false)
-              }}
-              onKeyDown={handleKey}
-              disabled={streaming}
-              placeholder={streaming ? 'Working...' : 'Ask anything…'}
-              rows={1}
-              style={{ maxHeight: '120px', resize: 'none' }}
-              className="flex-1 bg-gray-50 border border-gray-200 focus:border-gray-400 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-colors disabled:opacity-50"
-              onInput={(e) => {
-                const el = e.currentTarget
-                el.style.height = 'auto'
-                el.style.height = Math.min(el.scrollHeight, 120) + 'px'
-              }}
+            <textarea ref={inputRef} value={input}
+              onChange={(e) => { setInput(e.target.value); if (e.target.value === '/') setShowSkills(true); else if (!e.target.value.startsWith('/')) setShowSkills(false) }}
+              onKeyDown={handleKey} disabled={streaming}
+              placeholder={streaming ? 'Working…' : 'Ask anything — read email, check calendar, search CRM…'}
+              rows={1} style={{ flex: 1, background: ink, border: `1px solid ${border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: cream, fontFamily: 'Georgia, serif', outline: 'none', resize: 'none', maxHeight: 120, lineHeight: 1.5, transition: 'border-color 0.15s' }}
+              onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
             />
-
-            <button
-              onClick={() => send()}
-              disabled={streaming || !input.trim()}
-              className="p-2.5 bg-gray-900 hover:bg-gray-700 active:bg-gray-600 disabled:opacity-30 text-white rounded-xl transition-colors flex-shrink-0"
-            >
+            <button onClick={() => send()} disabled={streaming || !input.trim()} style={{ background: streaming || !input.trim() ? 'rgba(184,150,62,0.3)' : gold, border: 'none', borderRadius: 10, padding: 10, cursor: streaming || !input.trim() ? 'not-allowed' : 'pointer', color: ink, flexShrink: 0, display: 'flex', transition: 'background 0.2s' }}>
               {streaming ? (
-                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ animation: 'spin 1s linear infinite' }}>
+                  <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"/>
                 </svg>
               ) : (
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               )}
             </button>
           </div>
-          <p className="hidden md:block text-[10px] text-gray-400 mt-1.5 text-center">
-            Enter to send · Shift+Enter for new line · / for skills
+          <p className="hidden md:block" style={{ fontSize: 10, color: 'rgba(248,244,238,0.2)', marginTop: 8, textAlign: 'center', fontFamily: 'Courier New, monospace', letterSpacing: '0.08em' }}>
+            ENTER TO SEND · SHIFT+ENTER FOR NEW LINE · / FOR SKILLS
           </p>
         </div>
       </div>
+
+      <style>{`
+        @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        textarea::placeholder { color: rgba(248,244,238,0.25); }
+        input::placeholder { color: rgba(248,244,238,0.25); }
+        button:hover { opacity: 0.85; }
+      `}</style>
     </div>
   )
 }
