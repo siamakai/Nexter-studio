@@ -1,4 +1,7 @@
 const CALENDLY_BASE = 'https://api.calendly.com'
+const TZ = 'Europe/Paris'
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleString('en-GB', { timeZone: TZ, weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 
 async function calendlyGet(path: string) {
   const res = await fetch(`${CALENDLY_BASE}${path}`, {
@@ -63,7 +66,7 @@ export async function execCalendlyTool(name: string, input: Record<string, unkno
         const end = e.end_time as string
         const uuid = (e.uri as string).split('/').pop()
         const location = (e.location as Record<string, string>)?.join_url || (e.location as Record<string, string>)?.location || 'TBD'
-        return `📅 ${name}\n   Start: ${new Date(start).toLocaleString()}\n   End: ${new Date(end).toLocaleString()}\n   Location: ${location}\n   UUID: ${uuid}`
+        return `📅 ${name}\n   Start: ${fmtTime(start)}\n   End: ${fmtTime(end)}\n   Location: ${location}\n   UUID: ${uuid}`
       }).join('\n\n')
     }
 
@@ -82,8 +85,8 @@ export async function execCalendlyTool(name: string, input: Record<string, unkno
 
       return [
         `Event: ${event.name}`,
-        `Start: ${new Date(event.start_time).toLocaleString()}`,
-        `End: ${new Date(event.end_time).toLocaleString()}`,
+        `Start: ${fmtTime(event.start_time as string)}`,
+        `End: ${fmtTime(event.end_time as string)}`,
         `Location/Link: ${location}`,
         `Invitee: ${invitee.name || 'Unknown'} <${invitee.email || 'Unknown'}>`,
         `Status: ${invitee.status || event.status}`,
