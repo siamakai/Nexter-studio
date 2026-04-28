@@ -178,7 +178,7 @@ async function processCalendlyBookings(): Promise<string[]> {
           source_account: 'calendly',
           event_type: event.name || 'Meeting',
           scheduled_time: event.start_time
-            ? new Date(event.start_time).toLocaleString('en-CA', { timeZone: 'Europe/Paris' })
+            ? new Date(event.start_time).toLocaleString('en-CA', { timeZone: 'Europe/Budapest' })
             : undefined,
         })
         logs.push(`[Calendly] ${result.message}`)

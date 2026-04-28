@@ -1,5 +1,5 @@
 const CALENDLY_BASE = 'https://api.calendly.com'
-const TZ = 'Europe/Paris'
+const TZ = 'Europe/Budapest'
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', { timeZone: TZ, weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 

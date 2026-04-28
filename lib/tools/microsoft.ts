@@ -70,7 +70,7 @@ export const microsoftTools = [
         title: { type: 'string' },
         start_datetime: { type: 'string', description: 'ISO 8601 e.g. 2026-04-25T14:00:00' },
         end_datetime: { type: 'string', description: 'ISO 8601 e.g. 2026-04-25T15:00:00' },
-        timezone: { type: 'string', description: 'IANA timezone e.g. Europe/Paris (default Europe/Paris)' },
+        timezone: { type: 'string', description: 'IANA timezone e.g. Europe/Budapest (default Europe/Budapest)' },
         description: { type: 'string' },
         attendee_email: { type: 'string' },
         location: { type: 'string', description: 'Location or Teams/Zoom meeting link' },
@@ -144,13 +144,13 @@ export async function execMicrosoftTool(name: string, input: Record<string, unkn
       return events.map((e: Record<string, unknown>) => {
         const start = (e.start as Record<string, string>)?.dateTime
         const loc = (e.location as Record<string, string>)?.displayName || ''
-        const fmt = new Date(start).toLocaleString('en-GB', { timeZone: 'Europe/Paris', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+        const fmt = new Date(start).toLocaleString('en-GB', { timeZone: 'Europe/Budapest', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
         return `📅 ${e.subject}\n   ${fmt}\n   ${loc}\n   ID: ${e.id}`
       }).join('\n\n')
     }
 
     case 'ms_create_calendar_event': {
-      const tz = (input.timezone as string) || 'Europe/Paris'
+      const tz = (input.timezone as string) || 'Europe/Budapest'
       const body: Record<string, unknown> = {
         subject: input.title,
         body: { contentType: 'Text', content: input.description || '' },

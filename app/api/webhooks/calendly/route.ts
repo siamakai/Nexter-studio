@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       source_account: 'calendly',
       event_type: eventType.name || scheduledEvent.name || 'Meeting',
       scheduled_time: scheduledEvent.start_time
-        ? new Date(scheduledEvent.start_time).toLocaleString('en-CA', { timeZone: 'Europe/Paris' })
+        ? new Date(scheduledEvent.start_time).toLocaleString('en-CA', { timeZone: 'Europe/Budapest' })
         : undefined,
     })
 
