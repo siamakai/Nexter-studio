@@ -31,7 +31,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#08080D' }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#1C2B4A' }}>
       <div className="w-full max-w-sm">
 
         {/* Logo */}
@@ -39,13 +39,13 @@ export default function LoginPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/nexter-group-logo.svg" alt="Nexter AI Group" className="mx-auto mb-8" style={{ width: 300, height: 'auto' }} />
           <div style={{ width: 40, height: 1, background: '#B8963E', margin: '0 auto 20px' }} />
-          <p style={{ color: 'rgba(248,244,238,0.45)', fontSize: 13, letterSpacing: '0.15em', fontFamily: 'Courier New, monospace', textTransform: 'uppercase' }}>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, letterSpacing: '0.15em', fontFamily: 'Courier New, monospace', textTransform: 'uppercase' }}>
             Private Access
           </p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ background: '#111118', border: '1px solid rgba(184,150,62,0.2)', borderRadius: 16, padding: 32 }}>
+        <form onSubmit={handleSubmit} style={{ background: '#243558', border: '1px solid rgba(184,150,62,0.3)', borderRadius: 16, padding: 32 }}>
           <label style={{ display: 'block', fontSize: 11, letterSpacing: '0.15em', color: 'rgba(248,244,238,0.45)', fontFamily: 'Courier New, monospace', textTransform: 'uppercase', marginBottom: 10 }}>
             Access Code
           </label>
@@ -58,7 +58,7 @@ export default function LoginPage() {
               autoFocus
               style={{
                 width: '100%', boxSizing: 'border-box',
-                background: '#08080D', border: '1px solid rgba(184,150,62,0.25)',
+                background: '#162036', border: '1px solid rgba(184,150,62,0.35)',
                 borderRadius: 10, padding: '12px 44px 12px 16px',
                 color: '#F8F4EE', fontSize: 14, outline: 'none',
                 letterSpacing: '0.15em', fontFamily: 'Courier New, monospace',
@@ -104,8 +104,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', fontSize: 11, color: 'rgba(248,244,238,0.25)', marginTop: 24, letterSpacing: '0.1em', fontFamily: 'Courier New, monospace' }}>
-          NEXTER AI GROUP · RESPONSIBLE AI ECOSYSTEM
+        <p style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 24, letterSpacing: '0.1em', fontFamily: 'Courier New, monospace' }}>
+NEXTER AI GROUP · RESPONSIBLE AI ECOSYSTEM
         </p>
       </div>
     </div>

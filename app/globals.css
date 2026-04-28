@@ -3,13 +3,13 @@
 :root {
   --gold: #B8963E;
   --gold-lt: #D4AF6A;
-  --navy: #0F2347;
-  --ink: #08080D;
-  --surface: #111118;
-  --surface2: #1A1A24;
-  --border: rgba(184,150,62,0.2);
-  --cream: #F8F4EE;
-  --muted: rgba(248,244,238,0.45);
+  --navy: #1C2B4A;
+  --ink: #F0EBE0;
+  --surface: #FAFAF7;
+  --surface2: #E8E2D4;
+  --border: rgba(184,150,62,0.3);
+  --cream: #1C2B4A;
+  --muted: rgba(28,43,74,0.5);
 }
 
 body {

@@ -25,13 +25,13 @@ const TOOL_ICONS: Record<string, string> = {
 }
 
 const gold = '#B8963E'
-const goldLt = '#D4AF6A'
-const ink = '#08080D'
-const surface = '#111118'
-const surface2 = '#1A1A24'
-const border = 'rgba(184,150,62,0.2)'
-const cream = '#F8F4EE'
-const muted = 'rgba(248,244,238,0.45)'
+const goldLt = '#B8963E'
+const ink = '#F0EBE0'
+const surface = '#FAFAF7'
+const surface2 = '#E8E2D4'
+const border = 'rgba(184,150,62,0.3)'
+const cream = '#1C2B4A'
+const muted = 'rgba(28,43,74,0.5)'
 
 export default function StudioPage() {
   const router = useRouter()
@@ -207,7 +207,7 @@ Type **/** to see all available skills, or just ask me anything.`,
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#2A7D4F' }} />
                 <span style={{ fontSize: 11, color: muted, fontFamily: 'Courier New, monospace' }}>Online</span>
               </div>
-              <button onClick={handleLogout} style={{ fontSize: 12, color: '#C0392B', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Courier New, monospace' }}>Log out</button>
+              <button onClick={handleLogout} style={{ fontSize: 12, color: cream, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Courier New, monospace' }}>Log out</button>
             </div>
             <input type="text" value={workspaceRoot} onChange={(e) => setWorkspaceRoot(e.target.value)} placeholder="Workspace path (optional)" style={{ fontSize: 11, background: ink, border: `1px solid ${border}`, borderRadius: 8, padding: '8px 12px', color: cream, outline: 'none', fontFamily: 'Courier New, monospace', width: '100%', boxSizing: 'border-box' }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -228,7 +228,7 @@ Type **/** to see all available skills, or just ask me anything.`,
             <div key={msg.id} style={{ display: 'flex', gap: 12, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start' }}>
 
               {msg.role === 'assistant' && (
-                <div style={{ width: 30, height: 30, borderRadius: '50%', background: gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700, color: ink, fontFamily: 'Georgia, serif', marginTop: 2 }}>N</div>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', background: gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700, color: '#fff', fontFamily: 'Georgia, serif', marginTop: 2 }}>N</div>
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: msg.role === 'user' ? 'min(88%, 520px)' : 'min(100%, 720px)', minWidth: 0 }}>
@@ -297,7 +297,7 @@ Type **/** to see all available skills, or just ask me anything.`,
                     ? <img src={att.preview} alt={att.name} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: `1px solid ${border}` }} />
                     : <div style={{ width: 96, height: 56, background: ink, border: `1px solid ${border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: muted, padding: '0 6px', textAlign: 'center', fontFamily: 'Courier New, monospace' }}>{att.name}</div>
                   }
-                  <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, background: gold, border: 'none', borderRadius: '50%', color: ink, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>×</button>
+                  <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, background: gold, border: 'none', borderRadius: '50%', color: '#fff', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>×</button>
                 </div>
               ))}
             </div>
@@ -322,7 +322,7 @@ Type **/** to see all available skills, or just ask me anything.`,
               rows={1} style={{ flex: 1, background: ink, border: `1px solid ${border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: cream, fontFamily: 'Georgia, serif', outline: 'none', resize: 'none', maxHeight: 120, lineHeight: 1.5, transition: 'border-color 0.15s' }}
               onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
             />
-            <button onClick={() => send()} disabled={streaming || !input.trim()} style={{ background: streaming || !input.trim() ? 'rgba(184,150,62,0.3)' : gold, border: 'none', borderRadius: 10, padding: 10, cursor: streaming || !input.trim() ? 'not-allowed' : 'pointer', color: ink, flexShrink: 0, display: 'flex', transition: 'background 0.2s' }}>
+            <button onClick={() => send()} disabled={streaming || !input.trim()} style={{ background: streaming || !input.trim() ? 'rgba(184,150,62,0.3)' : gold, border: 'none', borderRadius: 10, padding: 10, cursor: streaming || !input.trim() ? 'not-allowed' : 'pointer', color: '#fff', flexShrink: 0, display: 'flex', transition: 'background 0.2s' }}>
               {streaming ? (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ animation: 'spin 1s linear infinite' }}>
                   <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"/>
@@ -334,7 +334,7 @@ Type **/** to see all available skills, or just ask me anything.`,
               )}
             </button>
           </div>
-          <p className="hidden md:block" style={{ fontSize: 10, color: 'rgba(248,244,238,0.2)', marginTop: 8, textAlign: 'center', fontFamily: 'Courier New, monospace', letterSpacing: '0.08em' }}>
+          <p className="hidden md:block" style={{ fontSize: 10, color: 'rgba(28,43,74,0.35)', marginTop: 8, textAlign: 'center', fontFamily: 'Courier New, monospace', letterSpacing: '0.08em' }}>
             ENTER TO SEND · SHIFT+ENTER FOR NEW LINE · / FOR SKILLS
           </p>
         </div>
@@ -343,8 +343,8 @@ Type **/** to see all available skills, or just ask me anything.`,
       <style>{`
         @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
         @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        textarea::placeholder { color: rgba(248,244,238,0.25); }
-        input::placeholder { color: rgba(248,244,238,0.25); }
+        textarea::placeholder { color: rgba(28,43,74,0.35); }
+        input::placeholder { color: rgba(28,43,74,0.35); }
         button:hover { opacity: 0.85; }
       `}</style>
     </div>
