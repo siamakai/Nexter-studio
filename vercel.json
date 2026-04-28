@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/emails",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/briefing",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/meeting-prep",
+      "schedule": "0 9 * * *"
     }
   ]
 }

@@ -127,6 +127,52 @@ export const ghlTools = [
       required: ['contact_id', 'pipeline_id', 'stage_id', 'title'],
     },
   },
+  {
+    name: 'ghl_stale_contacts',
+    description: 'Find hot/warm leads in GHL that have not been updated in X days — overdue follow-ups.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        days: { type: 'number', description: 'Days since last update to flag as stale (default 3)' },
+        limit: { type: 'number', description: 'Max contacts to return (default 20)' },
+      },
+    },
+  },
+  {
+    name: 'ghl_create_task',
+    description: 'Create a task or follow-up reminder on a GHL contact.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contact_id: { type: 'string' },
+        title: { type: 'string', description: 'Task title / what needs to be done' },
+        due_date: { type: 'string', description: 'ISO date e.g. 2026-05-01T10:00:00' },
+        description: { type: 'string', description: 'Optional details' },
+      },
+      required: ['contact_id', 'title'],
+    },
+  },
+  {
+    name: 'ghl_list_tasks',
+    description: 'List all tasks/reminders for a GHL contact.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contact_id: { type: 'string' },
+      },
+      required: ['contact_id'],
+    },
+  },
+  {
+    name: 'ghl_pipeline_health',
+    description: 'Get a health report of your GHL pipeline — deal counts, total value, and stalled deals per stage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        pipeline_id: { type: 'string', description: 'Specific pipeline ID (optional — fetches first pipeline if omitted)' },
+      },
+    },
+  },
 ]
 
 export async function execGhlTool(name: string, input: Record<string, unknown>): Promise<string> {
@@ -245,6 +291,79 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
       const data = await ghlFetch('/opportunities/', { method: 'POST', body: JSON.stringify(body) })
       const opp = data.opportunity
       return `Opportunity created:\nTitle: ${opp?.name}\nValue: $${opp?.monetaryValue || 0}\nID: ${opp?.id}`
+    }
+
+    case 'ghl_stale_contacts': {
+      const days = (input.days as number) || 3
+      const limit = (input.limit as number) || 20
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      const data = await ghlFetch(`/contacts/?locationId=${locationId()}&limit=100`)
+      const contacts = data.contacts || []
+      const stale = contacts.filter((c: Record<string, unknown>) => {
+        const updated = new Date((c.dateUpdated || c.dateAdded) as string)
+        const tags = (c.tags as string[]) || []
+        return updated < cutoff && tags.some(t => ['hot', 'warm'].includes(t.toLowerCase()))
+      }).slice(0, limit)
+      if (!stale.length) return `No hot/warm contacts stale for more than ${days} days. 🎉`
+      return `⚠️ ${stale.length} overdue follow-up(s) (${days}+ days):\n\n` + stale.map((c: Record<string, unknown>) => {
+        const updated = new Date((c.dateUpdated || c.dateAdded) as string)
+        const daysStale = Math.floor((Date.now() - updated.getTime()) / 86400000)
+        const tags = (c.tags as string[]) || []
+        return `👤 ${c.firstName || ''} ${c.lastName || ''} | ${c.email || ''} | Tags: ${tags.join(', ')} | ${daysStale}d ago | ID: ${c.id}`
+      }).join('\n')
+    }
+
+    case 'ghl_create_task': {
+      const body: Record<string, unknown> = {
+        title: input.title,
+        description: input.description || '',
+        dueDate: input.due_date || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        completed: false,
+      }
+      await ghlFetch(`/contacts/${input.contact_id}/tasks/`, { method: 'POST', body: JSON.stringify(body) })
+      return `Task created for contact ${input.contact_id}: "${input.title}"`
+    }
+
+    case 'ghl_list_tasks': {
+      const data = await ghlFetch(`/contacts/${input.contact_id}/tasks/`)
+      const tasks = data.tasks || []
+      if (!tasks.length) return `No tasks for contact ${input.contact_id}.`
+      return tasks.map((t: Record<string, unknown>) => {
+        const due = t.dueDate ? new Date(t.dueDate as string).toLocaleDateString('en-GB') : 'no due date'
+        const status = t.completed ? '✅' : '⏳'
+        return `${status} ${t.title} — due ${due}`
+      }).join('\n')
+    }
+
+    case 'ghl_pipeline_health': {
+      const pipelines = await ghlFetch(`/opportunities/pipelines/?locationId=${locationId()}`)
+      const pipeline = input.pipeline_id
+        ? (pipelines.pipelines || []).find((p: Record<string, unknown>) => p.id === input.pipeline_id)
+        : (pipelines.pipelines || [])[0]
+      if (!pipeline) return 'No pipeline found.'
+
+      const oppsData = await ghlFetch(`/opportunities/search/?locationId=${locationId()}&pipelineId=${pipeline.id}&status=open&limit=100`)
+      const opps = oppsData.opportunities || []
+
+      const byStage: Record<string, { count: number; value: number; names: string[] }> = {}
+      for (const opp of opps) {
+        const stage = (opp.pipelineStage as Record<string, string>)?.name || 'Unknown'
+        if (!byStage[stage]) byStage[stage] = { count: 0, value: 0, names: [] }
+        byStage[stage].count++
+        byStage[stage].value += (opp.monetaryValue as number) || 0
+        if (byStage[stage].names.length < 3) byStage[stage].names.push(opp.name as string)
+      }
+
+      const totalValue = opps.reduce((sum: number, o: Record<string, unknown>) => sum + ((o.monetaryValue as number) || 0), 0)
+      const lines = [
+        `Pipeline: ${pipeline.name}`,
+        `Total open deals: ${opps.length} | Total value: $${totalValue.toLocaleString()}`,
+        '',
+        ...Object.entries(byStage).map(([stage, s]) =>
+          `  ${stage}: ${s.count} deal(s) | $${s.value.toLocaleString()} | e.g. ${s.names.join(', ')}`
+        ),
+      ]
+      return lines.join('\n')
     }
 
     default:

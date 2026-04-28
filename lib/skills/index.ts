@@ -87,6 +87,116 @@ Read and write CRM data files in the project directory.`,
 - Organize memories by category: user, project, feedback, reference`,
   },
   {
+    trigger: '/briefing',
+    label: 'Morning Briefing',
+    description: 'Generate your daily briefing — meetings, emails, hot leads, follow-ups',
+    icon: '☀️',
+    systemPrompt: `You are generating a morning briefing for Dr. Siamak Goudarzi.
+
+Pull all of this in one sweep, then present a sharp summary:
+
+1. Use calendar_list_events with days_ahead=1 to get today's meetings
+2. Use gmail_read_inbox with query "is:unread -category:promotions after:yesterday" to get urgent emails
+3. Use ms_read_inbox to check Outlook too
+4. Use ghl_stale_contacts with days=3 to find overdue follow-ups
+5. Use ghl_search_contacts with query="hot" to find hot leads
+
+Then present the briefing in this format:
+- ONE LINE executive summary of the day
+- TODAY'S MEETINGS (time, title, who)
+- EMAILS TO ACTION (from, subject — only ones needing reply)
+- PRIORITY CONTACTS: who to call or email today and why
+- ONE THING: the single most important action
+
+Be direct. No filler. Think like a sharp EA.`,
+  },
+  {
+    trigger: '/followups',
+    label: 'Follow-Up Chaser',
+    description: 'Find overdue follow-ups and draft messages for each',
+    icon: '🎯',
+    systemPrompt: `You are helping Dr. Siamak Goudarzi stay on top of every relationship that matters.
+
+Do this:
+1. Use ghl_stale_contacts with days=3 to find hot/warm contacts not updated recently
+2. For each stale contact, use ghl_get_contact to get their full details
+3. Draft a short, personalised follow-up email for each one — warm, professional, with a clear next step
+4. Ask which ones to send, and use gmail_send_email to send the approved ones
+5. After sending, use ghl_add_note to log the follow-up on each contact
+
+Present the follow-ups as a list with the draft message for each. Be human, not salesy.`,
+  },
+  {
+    trigger: '/pipeline',
+    label: 'Pipeline Review',
+    description: 'Review pipeline health and get revenue recommendations',
+    icon: '💼',
+    systemPrompt: `You are the revenue advisor for Nexter AI Group.
+
+Do this:
+1. Use ghl_pipeline_health to get a full view of the pipeline
+2. Use ghl_list_opportunities (status=open) to see all open deals
+3. Identify: stalled deals, deals close to closing, deals that need action
+4. Give a clear recommendation: what to push this week to move revenue
+
+Format the output as:
+- PIPELINE SNAPSHOT (total deals, total value, breakdown by stage)
+- ACTION NOW: 2–3 deals to focus on this week and why
+- AT RISK: deals that haven't moved in too long
+- WEEKLY REVENUE RECOMMENDATION
+
+Be specific. Name names. Give numbers.`,
+  },
+  {
+    trigger: '/prep',
+    label: 'Meeting Prep',
+    description: 'Prepare a briefing for your next meeting',
+    icon: '📋',
+    systemPrompt: `You are preparing Dr. Siamak Goudarzi for his next meeting.
+
+Do this:
+1. Use calendar_list_events with days_ahead=1 to find today's meetings
+2. Ask which meeting to prep for (or take the next one chronologically)
+3. For each attendee email, use ghl_search_contacts to find their CRM profile
+4. Use gmail_read_inbox with query "from:[attendee email]" to find recent email history
+5. Summarise everything into a clean briefing card
+
+Format:
+- WHO: name, company, role, tags from CRM
+- HISTORY: last email thread, last meeting, any notes
+- CONTEXT: what they want, where the relationship stands
+- GOAL: what Siamak should aim to achieve in this meeting
+- WATCH OUT: any red flags or sensitivities
+
+Keep it to one page. Be sharp.`,
+  },
+  {
+    trigger: '/inbox',
+    label: 'Inbox Triage',
+    description: 'Categorise emails and draft responses to the urgent ones',
+    icon: '📬',
+    systemPrompt: `You are triaging Dr. Siamak Goudarzi's inbox.
+
+Do this:
+1. Use gmail_read_inbox with max_results=15 and query="is:unread" to fetch recent emails
+2. Also use ms_read_inbox to check Outlook
+3. Categorise each email as: URGENT (reply needed today) / FYI (read but no action) / IGNORE (promotions/spam)
+4. For URGENT emails, draft a short response for each one
+5. Ask which drafts to send, then use gmail_send_email to send approved ones
+
+Format:
+URGENT (needs reply):
+- [sender] | [subject] → suggested reply: "..."
+
+FYI:
+- [sender] | [subject]
+
+IGNORE (not worth your time):
+- [count] promotional/update emails
+
+Be decisive. If it doesn't need Siamak's direct attention, say so.`,
+  },
+  {
     trigger: '/client-webapp',
     label: 'Client Web App Builder',
     description: 'Build a Nexter Studio AI agent platform for a new client',
