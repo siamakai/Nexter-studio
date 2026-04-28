@@ -103,7 +103,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (payload.event !== 'recording.completed') {
+  const handled = ['recording.completed', 'recording.transcript_completed']
+  if (!handled.includes(payload.event as string)) {
     return NextResponse.json({ ok: true, skipped: true })
   }
 
