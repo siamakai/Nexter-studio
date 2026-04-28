@@ -143,7 +143,7 @@ function ConnectContent() {
           <li>Enter Client Secret (from your Google Console)</li>
           <li>In Step 1, paste these scopes and click Authorize:
             <div className="bg-zinc-900 rounded p-2 mt-1 font-mono text-xs text-zinc-300 break-all">
-              https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events
+              https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.readonly
             </div>
           </li>
           <li>Sign in with <strong className="text-white">info@i-review.ai</strong></li>
