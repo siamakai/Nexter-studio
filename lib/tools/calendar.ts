@@ -70,9 +70,13 @@ export async function execCalendarTool(name: string, input: Record<string, unkno
 
       if (!data.items?.length) return 'No upcoming events.'
 
+      const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', {
+        timeZone: 'Europe/Paris', weekday: 'short', day: 'numeric', month: 'short',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      })
       return data.items.map((e) => {
         const start = e.start?.dateTime || e.start?.date || 'TBD'
-        return `📅 ${e.summary}\n   ${new Date(start).toLocaleString()}\n   ${e.location || ''}\n   ID: ${e.id}`
+        return `📅 ${e.summary}\n   ${fmt(start)}\n   ${e.location || ''}\n   ID: ${e.id}`
       }).join('\n\n')
     }
 
@@ -83,8 +87,8 @@ export async function execCalendarTool(name: string, input: Record<string, unkno
           summary: input.title as string,
           description: input.description as string,
           location: input.location as string,
-          start: { dateTime: input.start_datetime as string, timeZone: 'America/Toronto' },
-          end: { dateTime: input.end_datetime as string, timeZone: 'America/Toronto' },
+          start: { dateTime: input.start_datetime as string, timeZone: 'Europe/Paris' },
+          end: { dateTime: input.end_datetime as string, timeZone: 'Europe/Paris' },
           attendees: input.attendee_email ? [{ email: input.attendee_email as string }] : undefined,
         },
       })
