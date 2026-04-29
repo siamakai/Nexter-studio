@@ -27,20 +27,20 @@ body {
 .prose { color: var(--cream); line-height: 1.75; }
 .prose h1,.prose h2,.prose h3 { color: var(--cream); font-weight: 700; margin: 1.25em 0 0.5em; font-family: Georgia, serif; }
 .prose h1 { font-size: 1.4em; }
-.prose h2 { font-size: 1.2em; color: var(--gold-lt); }
-.prose h3 { font-size: 1.05em; color: var(--gold-lt); }
+.prose h2 { font-size: 1.2em; color: #6b4a12; }
+.prose h3 { font-size: 1.05em; color: #6b4a12; }
 .prose p { margin: 0.75em 0; }
 .prose ul,.prose ol { padding-left: 1.5em; margin: 0.75em 0; }
 .prose li { margin: 0.3em 0; }
-.prose strong { color: #fff; font-weight: 700; }
-.prose em { color: var(--muted); }
-.prose a { color: var(--gold); text-decoration: underline; }
-.prose blockquote { border-left: 3px solid var(--gold); padding-left: 1em; color: var(--muted); margin: 0.75em 0; }
+.prose strong { color: #0D1B2E; font-weight: 700; }
+.prose em { color: rgba(28,43,74,0.7); font-style: italic; }
+.prose a { color: #6b4a12; text-decoration: underline; }
+.prose blockquote { border-left: 3px solid var(--gold); padding-left: 1em; color: rgba(28,43,74,0.65); margin: 0.75em 0; }
 .prose hr { border-color: var(--border); margin: 1.5em 0; }
-.prose code:not(pre code) { background: rgba(184,150,62,0.12); color: var(--gold-lt); padding: 0.15em 0.4em; border-radius: 0.25em; font-size: 0.875em; font-family: 'Courier New', monospace; border: 1px solid var(--border); }
-.prose pre { background: #0a0a10; border: 1px solid var(--border); border-radius: 0.5em; padding: 1em; overflow-x: auto; margin: 1em 0; }
-.prose pre code { background: none; color: var(--cream); padding: 0; font-size: 0.875em; font-family: 'Courier New', monospace; }
+.prose code:not(pre code) { background: rgba(184,150,62,0.15); color: #6b4a12; padding: 0.15em 0.4em; border-radius: 0.25em; font-size: 0.875em; font-family: 'Courier New', monospace; border: 1px solid rgba(184,150,62,0.35); }
+.prose pre { background: #1C2B4A; border: 1px solid rgba(28,43,74,0.2); border-radius: 0.5em; padding: 1em; overflow-x: auto; margin: 1em 0; }
+.prose pre code { background: none; color: #F0EBE0; padding: 0; font-size: 0.875em; font-family: 'Courier New', monospace; }
 .prose table { width: 100%; border-collapse: collapse; margin: 1em 0; }
-.prose th { background: rgba(184,150,62,0.1); font-weight: 700; text-align: left; padding: 0.5em 0.75em; border: 1px solid var(--border); color: var(--gold-lt); }
-.prose td { padding: 0.5em 0.75em; border: 1px solid var(--border); }
-.prose tr:hover td { background: rgba(184,150,62,0.05); }
+.prose th { background: rgba(184,150,62,0.12); font-weight: 700; text-align: left; padding: 0.5em 0.75em; border: 1px solid var(--border); color: #6b4a12; }
+.prose td { padding: 0.5em 0.75em; border: 1px solid var(--border); color: var(--cream); }
+.prose tr:hover td { background: rgba(184,150,62,0.07); }
