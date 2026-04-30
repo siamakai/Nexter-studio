@@ -11,6 +11,68 @@ import fs from 'fs/promises'
 
 const MEETINGS_FOLDER_NAME = 'Nexter AI — Meeting Reports'
 const TO = process.env.BRIEFING_EMAIL || process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
+const TASKS_FILE = () => path.join(process.cwd(), 'tasks', 'open.md')
+
+// ─── TASK EXTRACTION ──────────────────────────────────────────────────────────
+
+export async function extractAndSaveTasks(summary: string, meetingTitle: string, date: string): Promise<void> {
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+    const res = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      messages: [{
+        role: 'user',
+        content: `Extract all action items from this meeting summary. Return ONLY a JSON array, no markdown.
+Each item: {"task":"what to do","owner":"who (use 'Siamak' if unspecified)","deadline":"date or 'ASAP' or 'this week'","priority":"HIGH|MEDIUM|LOW"}
+
+MEETING: ${meetingTitle}
+SUMMARY:
+${summary}
+
+Return [] if no action items found.`,
+      }],
+    })
+
+    const raw = (res.content[0] as { text: string }).text.trim()
+    const match = raw.match(/\[[\s\S]*\]/)
+    if (!match) return
+    const tasks: { task: string; owner: string; deadline: string; priority: string }[] = JSON.parse(match[0])
+    if (!tasks.length) return
+
+    const dir = path.join(process.cwd(), 'tasks')
+    await fs.mkdir(dir, { recursive: true })
+
+    const lines = [`\n## ${date} — ${meetingTitle}\n`]
+    for (const t of tasks) {
+      lines.push(`- [ ] [${t.priority}] ${t.task} (${t.owner} · ${t.deadline})`)
+    }
+    lines.push('')
+
+    await fs.appendFile(TASKS_FILE(), lines.join('\n'), 'utf-8')
+  } catch (err) {
+    console.error('[meeting-report] Task extraction error:', err)
+  }
+}
+
+export async function getOpenTasks(): Promise<string> {
+  try {
+    const content = await fs.readFile(TASKS_FILE(), 'utf-8')
+    const lines = content.split('\n').filter(l => l.includes('- [ ]'))
+    if (!lines.length) return ''
+    return lines.slice(0, 10).join('\n')
+  } catch {
+    return ''
+  }
+}
+
+export async function markTaskDone(taskText: string): Promise<void> {
+  try {
+    const content = await fs.readFile(TASKS_FILE(), 'utf-8')
+    const updated = content.replace(`- [ ] ${taskText}`, `- [x] ${taskText}`)
+    await fs.writeFile(TASKS_FILE(), updated, 'utf-8')
+  } catch { /* ignore */ }
+}
 
 // ─── CLAUDE SUMMARY ──────────────────────────────────────────────────────────
 
@@ -189,7 +251,7 @@ export async function sendMeetingEmail(
 export async function sendNoTranscriptAlert(
   meetingTitle: string,
   meetingDate: string,
-  notesEndpointUrl: string,
+  _notesEndpointUrl: string,
 ): Promise<void> {
   if (!process.env.GOOGLE_REFRESH_TOKEN) return
   const auth = await getAuthedClient()

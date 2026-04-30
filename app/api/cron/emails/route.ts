@@ -1,8 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
 import { google } from 'googleapis'
 import { getAuthedClient } from '@/lib/google'
 import { getMsAccessToken } from '@/lib/microsoft'
 import { processLead } from '@/lib/lead-processor'
+
+// ── Inbox Triage ─────────────────────────────────────────────────────────────
+
+async function triageEmail(opts: {
+  from: string; subject: string; body: string; gmail: ReturnType<typeof google.gmail>; threadId: string; messageId: string
+}): Promise<void> {
+  const { from, subject, body, gmail, threadId, messageId } = opts
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+
+  const res = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 600,
+    messages: [{
+      role: 'user',
+      content: `Triage this email for Dr. Siamak Goudarzi, Founder of Nexter AI Group. Return ONLY valid JSON, no markdown.
+
+FROM: ${from}
+SUBJECT: ${subject}
+BODY: ${body.slice(0, 800)}
+
+Return: {"category":"urgent|action-needed|fyi|no-action","reason":"one sentence why","draft_reply":"short reply if action-needed or urgent, else null"}
+
+- urgent: needs response TODAY (client issue, time-sensitive deal, legal/financial)
+- action-needed: needs a reply but not urgent (general inquiry, follow-up request)
+- fyi: informational, no reply needed
+- no-action: newsletter, notification, spam`,
+    }],
+  })
+
+  const raw = (res.content[0] as { text: string }).text.trim()
+  const match = raw.match(/\{[\s\S]*\}/)
+  if (!match) return
+  const triage: { category: string; reason: string; draft_reply: string | null } = JSON.parse(match[0])
+
+  if (triage.category === 'no-action' || triage.category === 'fyi') return
+
+  // Save draft reply to Gmail Drafts
+  if (triage.draft_reply) {
+    try {
+      const myEmail = process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
+      const replySubject = subject.startsWith('Re:') ? subject : `Re: ${subject}`
+      const rawEmail = [
+        `From: ${myEmail}`,
+        `To: ${from}`,
+        `Subject: ${replySubject}`,
+        `In-Reply-To: ${messageId}`,
+        `References: ${messageId}`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        triage.draft_reply,
+      ].join('\r\n')
+      await gmail.users.drafts.create({
+        userId: 'me',
+        requestBody: { message: { raw: Buffer.from(rawEmail).toString('base64url'), threadId } },
+      })
+    } catch { /* non-critical */ }
+  }
+
+  // For urgent: send an immediate alert
+  if (triage.category === 'urgent') {
+    try {
+      const myEmail = process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
+      const raw = Buffer.from([
+        `To: ${myEmail}`,
+        `Subject: 🚨 URGENT EMAIL: ${subject}`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        `URGENT email requires your attention today.\n\nFrom: ${from}\nSubject: ${subject}\nReason: ${triage.reason}\n${triage.draft_reply ? `\nDraft reply saved to Gmail Drafts:\n${triage.draft_reply}` : ''}`,
+      ].join('\r\n')).toString('base64url')
+      await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+    } catch { /* non-critical */ }
+  }
+}
 
 // Vercel protects cron routes with CRON_SECRET header automatically
 function isAuthorized(req: NextRequest) {
@@ -73,6 +149,16 @@ async function processGmailAccount(accountEmail: string): Promise<string[]> {
         source_account: accountEmail,
       })
       logs.push(`[Gmail:${accountEmail}] ${result.message}`)
+
+      // Inbox triage — runs in parallel, non-blocking
+      triageEmail({
+        from: `${fromName} <${fromEmail}>`,
+        subject,
+        body: body || '',
+        gmail,
+        threadId: full.data.threadId || msg.id!,
+        messageId: msg.id!,
+      }).catch(e => console.error('[triage]', e))
     }
   } catch (err) {
     logs.push(`[Gmail:${accountEmail}] ERROR: ${String(err)}`)
