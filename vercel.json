@@ -1,20 +1,20 @@
 {
   "crons": [
     {
-      "path": "/api/cron/emails",
-      "schedule": "0 9 * * *"
-    },
-    {
       "path": "/api/cron/briefing",
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/emails",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/meeting-prep",
-      "schedule": "0 9 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/meet-transcripts",
-      "schedule": "0 10 * * *"
+      "schedule": "0 */2 * * *"
     }
   ]
 }

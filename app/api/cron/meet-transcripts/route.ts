@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { google } from 'googleapis'
 import { getAuthedClient } from '@/lib/google'
-import path from 'path'
-import fs from 'fs/promises'
+import {
+  generateMeetingSummary,
+  saveMeetingToDrive,
+  saveMeetingLocally,
+  findGhlContact,
+  addGhlNote,
+  sendMeetingEmail,
+  sendNoTranscriptAlert,
+  buildMeetingEmailHtml,
+} from '@/lib/meeting-report'
 
 function isAuthorized(req: NextRequest) {
   return req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`
@@ -11,28 +18,8 @@ function isAuthorized(req: NextRequest) {
 
 const TZ = 'Europe/Budapest'
 
-async function findGhlContact(query: string): Promise<{ id: string; name: string } | null> {
-  if (!process.env.GHL_API_KEY || !query) return null
-  try {
-    const res = await fetch(
-      `https://services.leadconnectorhq.com/contacts/?locationId=${process.env.GHL_LOCATION_ID}&query=${encodeURIComponent(query)}&limit=1`,
-      { headers: { Authorization: `Bearer ${process.env.GHL_API_KEY}`, Version: '2021-07-28' } }
-    )
-    const data = await res.json()
-    const c = data.contacts?.[0]
-    if (!c) return null
-    return { id: c.id, name: `${c.firstName || ''} ${c.lastName || ''}`.trim() }
-  } catch { return null }
-}
-
-async function addGhlNote(contactId: string, note: string): Promise<void> {
-  if (!process.env.GHL_API_KEY) return
-  await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}/notes/`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.GHL_API_KEY}`, Version: '2021-07-28', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body: note }),
-  })
-}
+// Search window: 2.5 hours — matches the every-2-hour cron with 30-min overlap
+const WINDOW_MS = 2.5 * 60 * 60 * 1000
 
 export async function GET(req: NextRequest) {
   if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -40,96 +27,115 @@ export async function GET(req: NextRequest) {
 
   const auth = await getAuthedClient()
   const drive = google.drive({ version: 'v3', auth })
-  const gmail = google.gmail({ version: 'v1', auth })
 
-  // Search for Meet transcript docs created in the last 35 minutes
-  const since = new Date(Date.now() - 35 * 60 * 1000).toISOString()
-  const query = `mimeType='application/vnd.google-apps.document' and (name contains 'transcript' or name contains 'Transcript') and createdTime > '${since}'`
+  // Find Meet transcript docs created in the search window
+  const since = new Date(Date.now() - WINDOW_MS).toISOString()
+  const query = [
+    `mimeType='application/vnd.google-apps.document'`,
+    `(name contains 'transcript' or name contains 'Transcript' or name contains 'Meet transcript')`,
+    `createdTime > '${since}'`,
+    `trashed=false`,
+  ].join(' and ')
 
   const { data } = await drive.files.list({
     q: query,
-    fields: 'files(id, name, createdTime, owners)',
+    fields: 'files(id, name, createdTime)',
     orderBy: 'createdTime desc',
-    pageSize: 10,
+    pageSize: 20,
   })
 
   const files = data.files || []
-  if (!files.length) return NextResponse.json({ ok: true, message: 'No new Meet transcripts found' })
+
+  // No transcripts found — send alert asking for manual notes
+  if (!files.length) {
+    // Check if there were any Google Meet calendar events in the window
+    const calendarAuth = await getAuthedClient()
+    const calendar = google.calendar({ version: 'v3', auth: calendarAuth })
+    const calRes = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: new Date(Date.now() - WINDOW_MS).toISOString(),
+      timeMax: new Date().toISOString(),
+      singleEvents: true,
+      q: 'meet.google.com',
+    })
+
+    const meetEvents = (calRes.data.items || []).filter(e =>
+      e.hangoutLink || e.conferenceData?.entryPoints?.some(ep => ep.uri?.includes('meet.google.com'))
+    )
+
+    if (meetEvents.length) {
+      // There was a Google Meet but no transcript — send alert
+      for (const event of meetEvents) {
+        const title = event.summary || 'Google Meet'
+        const startDate = new Date(event.start?.dateTime || event.start?.date || Date.now())
+          .toLocaleString('en-GB', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+        await sendNoTranscriptAlert(
+          title,
+          startDate,
+          `${process.env.NEXT_PUBLIC_APP_URL || 'https://va.nexterai.agency'}/api/meetings/notes`
+        ).catch(console.error)
+      }
+      return NextResponse.json({ ok: true, message: `No transcripts found — sent ${meetEvents.length} alert(s) for detected Meet events` })
+    }
+
+    return NextResponse.json({ ok: true, message: 'No new Meet transcripts and no recent Meet events found' })
+  }
 
   const logs: string[] = []
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
   for (const file of files) {
     try {
       // Export Google Doc as plain text
-      const exportRes = await drive.files.export({ fileId: file.id!, mimeType: 'text/plain' }, { responseType: 'text' })
+      const exportRes = await drive.files.export(
+        { fileId: file.id!, mimeType: 'text/plain' },
+        { responseType: 'text' }
+      )
       const rawText = (exportRes.data as string).slice(0, 8000)
 
-      // Extract meeting title from filename — "Meeting transcript - Title - Date"
-      const titleMatch = file.name?.match(/transcript[- ]+(.+?)(?:\s*[-–]\s*\d{4}|$)/i)
+      // Parse meeting title from filename: "Meet transcript - Title - Date" or "Transcript of Title"
+      const titleMatch =
+        file.name?.match(/(?:transcript(?:\s+of)?)[- ]+(.+?)(?:\s*[-–]\s*\d{4}|$)/i) ||
+        file.name?.match(/^(.+?)\s*[-–]\s*transcript/i)
       const meetingTitle = titleMatch?.[1]?.trim() || file.name || 'Google Meet'
 
       const createdAt = new Date(file.createdTime || Date.now()).toLocaleString('en-GB', {
         timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
       })
+      const datePrefix = new Date(file.createdTime || Date.now()).toISOString().slice(0, 10)
 
       // Generate summary
-      const aiRes = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1500,
-        messages: [{
-          role: 'user',
-          content: `You are the executive assistant to Dr. Siamak Goudarzi, Founder of Nexter AI Group.
+      const summary = await generateMeetingSummary(meetingTitle, createdAt, rawText)
 
-A Google Meet just ended. Generate a structured meeting report.
+      const fileContent = `# ${meetingTitle}\nDate: ${createdAt}\nSource: Google Meet\n\n${summary}\n\n---\n*Auto-generated by Nexter AI VA*\n`
 
-MEETING: ${meetingTitle}
-DATE: ${createdAt}
-SOURCE: Google Meet (auto-transcript)
-
-TRANSCRIPT:
-${rawText}
-
-Write a meeting report with these sections:
-1. SUMMARY (2–3 sentences: what was discussed, what was decided)
-2. KEY POINTS (bullet list)
-3. ACTION ITEMS (what needs to happen next, who is responsible)
-4. CLIENT SENTIMENT (positive / neutral / needs attention)
-5. FOLLOW-UP RECOMMENDED (specific next step with timeline)
-
-Be precise and professional. Plain text only.`,
-        }],
-      })
-
-      const summary = (aiRes.content[0] as { type: 'text'; text: string }).text
-      const datePrefix = new Date().toISOString().slice(0, 10)
+      // Save locally (backup) + to Google Drive
       const safeName = meetingTitle.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 50)
-      const filename = `${datePrefix}-meet-${safeName}.md`
+      const localFilename = `${datePrefix}-meet-${safeName}.md`
+      await saveMeetingLocally(localFilename, fileContent)
+      const driveUrl = await saveMeetingToDrive(meetingTitle, fileContent, datePrefix)
 
-      // Save to meetings/ folder
-      const dir = path.join(process.cwd(), 'meetings')
-      await fs.mkdir(dir, { recursive: true })
-      await fs.writeFile(path.join(dir, filename), `# ${meetingTitle}\nDate: ${createdAt}\nSource: Google Meet\n\n${summary}\n\n---\n*Auto-generated by Nexter AI VA*\n`, 'utf-8')
-
-      // Find contact in GHL by meeting title keywords
+      // Find contact in GHL
       const searchTerm = meetingTitle.split(/\s+/).slice(0, 3).join(' ')
       const contact = await findGhlContact(searchTerm)
       if (contact) {
         await addGhlNote(contact.id, `GOOGLE MEET SUMMARY — ${createdAt}\nMeeting: ${meetingTitle}\n\n${summary}`)
       }
 
-      // Send summary email
-      const to = process.env.BRIEFING_EMAIL || process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
-      const subject = `Meet Summary: ${meetingTitle} — ${datePrefix}`
-      const emailBody = `GOOGLE MEET SUMMARY\n${'─'.repeat(50)}\nMeeting: ${meetingTitle}\nDate: ${createdAt}\n\n${summary}\n\n${'─'.repeat(50)}\nSaved to: meetings/${filename}${contact ? `\nLogged in CRM for: ${contact.name}` : ''}`
-      const raw = Buffer.from(
-        [`To: ${to}`, `Subject: ${subject}`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', '', emailBody].join('\r\n')
-      ).toString('base64url')
-      await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+      // Send styled email
+      const html = buildMeetingEmailHtml({
+        title: meetingTitle,
+        date: createdAt,
+        source: 'Google Meet',
+        summary,
+        driveUrl,
+        contactName: contact?.name || null,
+      })
+      await sendMeetingEmail(`📋 Meet Summary: ${meetingTitle} — ${datePrefix}`, html)
 
-      logs.push(`Processed: ${meetingTitle} → ${filename}`)
+      logs.push(`✓ ${meetingTitle} → Drive: ${driveUrl ? 'saved' : 'failed'} | CRM: ${contact ? contact.name : 'not found'}`)
     } catch (err) {
-      logs.push(`Error processing ${file.name}: ${String(err)}`)
+      logs.push(`✗ Error processing ${file.name}: ${String(err)}`)
+      console.error('[meet-transcripts] Error:', err)
     }
   }
 

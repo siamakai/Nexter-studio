@@ -3,17 +3,21 @@ import { getOAuthClient } from '@/lib/google'
 import { google } from 'googleapis'
 
 export async function GET(req: NextRequest) {
+  // Derive base URL from request if env var is missing
+  const base = process.env.NEXT_PUBLIC_APP_URL ||
+    `${req.nextUrl.protocol}//${req.nextUrl.host}`
+
   const oauthError = req.nextUrl.searchParams.get('error')
   if (oauthError) {
     const msg = oauthError === 'access_denied'
       ? 'access_denied — use the manual token option instead.'
       : oauthError
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/connect?error=${encodeURIComponent(msg)}`)
+    return NextResponse.redirect(`${base}/connect?error=${encodeURIComponent(msg)}`)
   }
 
   const code = req.nextUrl.searchParams.get('code')
   if (!code) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/connect?error=No+authorization+code+received`)
+    return NextResponse.redirect(`${base}/connect?error=No+authorization+code+received`)
   }
 
   try {
@@ -23,14 +27,18 @@ export async function GET(req: NextRequest) {
 
     const oauth2 = google.oauth2({ version: 'v2', auth: client })
     const { data: userInfo } = await oauth2.userinfo.get()
-    const email = userInfo.email!
-    const refreshToken = tokens.refresh_token!
+    const email = userInfo.email || ''
+    const refreshToken = tokens.refresh_token || ''
 
-    // Redirect to connect page with token shown — user adds to Vercel env vars
+    if (!refreshToken) {
+      // Google only returns refresh_token on first consent — force re-consent
+      return NextResponse.redirect(`${base}/connect?error=No+refresh+token+returned.+Please+revoke+app+access+at+myaccount.google.com%2Fpermissions+then+try+again.`)
+    }
+
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/connect?success=true&email=${email}&token=${encodeURIComponent(refreshToken)}&provider=google`
+      `${base}/connect?success=true&email=${encodeURIComponent(email)}&token=${encodeURIComponent(refreshToken)}&provider=google`
     )
   } catch (err) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/connect?error=${encodeURIComponent(String(err))}`)
+    return NextResponse.redirect(`${base}/connect?error=${encodeURIComponent(String(err))}`)
   }
 }
