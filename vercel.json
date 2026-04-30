@@ -6,15 +6,15 @@
     },
     {
       "path": "/api/cron/emails",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/cron/meeting-prep",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/meet-transcripts",
-      "schedule": "0 */2 * * *"
+      "schedule": "0 20 * * *"
     }
   ]
 }
