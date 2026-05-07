@@ -8,8 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { google } from 'googleapis'
 import { getAuthedClient } from '@/lib/google'
-import fs from 'fs/promises'
-import path from 'path'
+import { getOpenTasksText, getTasks, getRecentMeetings } from '@/lib/supabase'
 
 function isAuthorized(req: NextRequest) {
   return req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`
@@ -18,24 +17,13 @@ function isAuthorized(req: NextRequest) {
 const TZ = 'Europe/Budapest'
 
 async function getWeekMeetings(): Promise<string> {
-  if (!process.env.GOOGLE_REFRESH_TOKEN) return 'Not available'
   try {
-    // Read meeting files created this week
-    const dir = path.join(process.cwd(), 'meetings')
-    const files = await fs.readdir(dir).catch(() => [] as string[])
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const weekFiles = files.filter(f => {
-      const match = f.match(/^(\d{4}-\d{2}-\d{2})/)
-      if (!match) return false
-      return new Date(match[1]) >= weekAgo
-    })
-    if (!weekFiles.length) return 'No meeting reports this week'
-    const summaries = await Promise.all(weekFiles.slice(0, 5).map(async f => {
-      const content = await fs.readFile(path.join(dir, f), 'utf-8')
-      return content.split('\n').slice(0, 6).join('\n')
-    }))
-    return summaries.join('\n\n---\n\n')
-  } catch { return 'Unable to read meeting files' }
+    const meetings = await getRecentMeetings(7)
+    if (!meetings.length) return 'No meeting reports this week'
+    return meetings.map(m =>
+      `${m.date} — ${m.title}\nAttendees: ${m.attendees || 'N/A'}\n${m.summary.slice(0, 200)}`
+    ).join('\n\n---\n\n')
+  } catch { return 'Unable to read meeting reports' }
 }
 
 async function getWeekLeads(): Promise<string> {
@@ -43,7 +31,7 @@ async function getWeekLeads(): Promise<string> {
   try {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const res = await fetch(
-      `https://services.leadconnectorhq.com/contacts/?locationId=${process.env.GHL_LOCATION_ID}&limit=50&sortBy=dateAdded&sortDirection=desc`,
+      `https://services.leadconnectorhq.com/contacts/?locationId=${process.env.GHL_LOCATION_ID}&limit=50&sortBy=date_added`,
       { headers: { Authorization: `Bearer ${process.env.GHL_API_KEY}`, Version: '2021-07-28' } }
     )
     const data = await res.json()
@@ -51,8 +39,8 @@ async function getWeekLeads(): Promise<string> {
       new Date(c.dateAdded as string) >= new Date(since)
     )
     if (!weekLeads.length) return 'No new leads this week'
-    const hot = weekLeads.filter((c: Record<string, unknown>) => (c.tags as string[] || []).includes('hot')).length
-    const warm = weekLeads.filter((c: Record<string, unknown>) => (c.tags as string[] || []).includes('warm')).length
+    const hot = weekLeads.filter((c: Record<string, unknown>) => ((c.tags as string[]) || []).includes('hot')).length
+    const warm = weekLeads.filter((c: Record<string, unknown>) => ((c.tags as string[]) || []).includes('warm')).length
     const names = weekLeads.slice(0, 5).map((c: Record<string, unknown>) =>
       `${c.firstName || ''} ${c.lastName || ''} (${c.companyName || 'unknown company'})`
     ).join(', ')
@@ -84,19 +72,17 @@ async function getWeekCalendar(): Promise<string> {
   } catch { return 'Calendar error' }
 }
 
-async function getOpenTasks(): Promise<string> {
+async function getTasksReport(): Promise<string> {
   try {
-    const content = await fs.readFile(path.join(process.cwd(), 'tasks', 'open.md'), 'utf-8')
-    const open = content.split('\n').filter(l => l.includes('- [ ]')).slice(0, 10)
-    const done = content.split('\n').filter(l => l.includes('- [x]')).length
-    return `Open: ${open.length} tasks | Completed this week: ${done}\n${open.join('\n')}`
-  } catch { return 'No task file found' }
+    const [open, done] = await Promise.all([getTasks(false), getTasks(true)])
+    const text = await getOpenTasksText()
+    return `Open: ${open.length} tasks | Completed: ${done.length}\n${text}`
+  } catch { return 'No tasks found' }
 }
 
 export async function GET(req: NextRequest) {
   if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Only generate on Fridays (day 5) — skip other days unless forced
   const today = new Date()
   const dayOfWeek = today.toLocaleDateString('en-US', { timeZone: TZ, weekday: 'long' })
   const force = req.nextUrl.searchParams.get('force') === '1'
@@ -109,7 +95,7 @@ export async function GET(req: NextRequest) {
     getWeekMeetings(),
     getWeekLeads(),
     getWeekCalendar(),
-    getOpenTasks(),
+    getTasksReport(),
   ])
 
   const weekEnding = today.toLocaleDateString('en-GB', { timeZone: TZ, day: 'numeric', month: 'long', year: 'numeric' })
@@ -158,7 +144,6 @@ These must be specific, revenue or relationship-focused, and actionable on Monda
 
   const review = (res.content[0] as { text: string }).text
 
-  // Email the review
   if (process.env.GOOGLE_REFRESH_TOKEN) {
     try {
       const auth = await getAuthedClient()

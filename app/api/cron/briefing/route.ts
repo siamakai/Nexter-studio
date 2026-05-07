@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { google } from 'googleapis'
 import { getAuthedClient } from '@/lib/google'
 import { getMsAccessToken } from '@/lib/microsoft'
-import { getOpenTasks } from '@/lib/meeting-report'
+import { getOpenTasksText, getContentSummary, getDelegationSummary } from '@/lib/supabase'
 
 function isAuthorized(req: NextRequest) {
   return req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`
@@ -178,12 +178,14 @@ async function getOverdueFollowups(): Promise<string> {
 export async function GET(req: NextRequest) {
   if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const [meetingData, emails, hotLeads, overdue, openTasks] = await Promise.all([
+  const [meetingData, emails, hotLeads, overdue, openTasks, contentSummary, delegationSummary] = await Promise.all([
     getTodayMeetings(),
     getUrgentEmails(),
     getHotLeads(),
     getOverdueFollowups(),
-    getOpenTasks(),
+    getOpenTasksText(),
+    getContentSummary(),
+    getDelegationSummary(),
   ])
 
   // Calendar Defense — auto-block focus time if meeting-heavy day
@@ -220,12 +222,20 @@ ${overdue}
 OPEN TASKS:
 ${openTasks || '  No open tasks'}
 
+CONTENT PIPELINE:
+${contentSummary}
+
+TEAM DELEGATIONS:
+${delegationSummary}
+
 FORMAT (plain text):
 - One executive summary sentence
 - MEETINGS (if any)
 - EMAILS TO ACTION (if urgent)
 - OPEN TASKS: list HIGH priority first
 - PRIORITY CONTACTS: who to reach today and why
+- CONTENT: any overdue or empty slots this week
+- TEAM: any overdue delegations (name the person)
 - ONE THING: the single most important action for today`,
     }],
   })

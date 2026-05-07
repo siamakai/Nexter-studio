@@ -2,31 +2,39 @@
   "crons": [
     {
       "path": "/api/cron/briefing",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/emails",
-      "schedule": "0 8 * * *"
+      "schedule": "0 4 * * *"
     },
     {
       "path": "/api/cron/meeting-prep",
-      "schedule": "0 7 * * *"
+      "schedule": "0 5 * * *"
     },
     {
-      "path": "/api/cron/meet-transcripts",
-      "schedule": "0 20 * * *"
+      "path": "/api/cron/emails",
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/followups",
-      "schedule": "0 9 * * *"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/relationships",
-      "schedule": "0 10 * * *"
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/meet-transcripts",
+      "schedule": "0 18 * * *"
     },
     {
       "path": "/api/cron/weekly-review",
-      "schedule": "0 17 * * *"
+      "schedule": "0 15 * * 5"
+    },
+    {
+      "path": "/api/cron/content",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/delegations",
+      "schedule": "0 6 * * *"
     }
   ]
 }

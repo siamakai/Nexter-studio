@@ -173,6 +173,18 @@ export const ghlTools = [
       },
     },
   },
+  {
+    name: 'ghl_list_contacts_by_tag',
+    description: 'List ALL contacts in GHL filtered by tag (e.g. "hot", "warm", "client", "prospect"). Use this when asked to show hot leads, warm leads, clients, etc. Returns all matching contacts.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tag: { type: 'string', description: 'Tag to filter by — e.g. "hot", "warm", "client", "prospect"' },
+        limit: { type: 'number', description: 'Max results (default 100)' },
+      },
+      required: ['tag'],
+    },
+  },
 ]
 
 export async function execGhlTool(name: string, input: Record<string, unknown>): Promise<string> {
@@ -297,7 +309,7 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
       const days = (input.days as number) || 3
       const limit = (input.limit as number) || 20
       const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-      const data = await ghlFetch(`/contacts/?locationId=${locationId()}&limit=100`)
+      const data = await ghlFetch(`/contacts/?locationId=${locationId()}&limit=100&sortBy=date_updated`)
       const contacts = data.contacts || []
       const stale = contacts.filter((c: Record<string, unknown>) => {
         const updated = new Date((c.dateUpdated || c.dateAdded) as string)
@@ -364,6 +376,23 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
         ),
       ]
       return lines.join('\n')
+    }
+
+    case 'ghl_list_contacts_by_tag': {
+      const tag = (input.tag as string).toLowerCase()
+      const limit = (input.limit as number) || 100
+      // Fetch up to 100 contacts sorted by recently updated, then filter by tag client-side
+      const data = await ghlFetch(`/contacts/?locationId=${locationId()}&limit=${limit}&sortBy=date_updated`)
+      const contacts = data.contacts || []
+      const filtered = contacts.filter((c: Record<string, unknown>) =>
+        ((c.tags as string[]) || []).some((t: string) => t.toLowerCase() === tag)
+      )
+      if (!filtered.length) return `No contacts found with tag "${tag}".`
+      return `Found ${filtered.length} contact(s) tagged "${tag}":\n\n` + filtered.map((c: Record<string, unknown>) => {
+        const tags = ((c.tags as string[]) || []).join(', ')
+        const updated = c.dateUpdated ? new Date(c.dateUpdated as string).toLocaleDateString('en-GB') : ''
+        return `👤 ${c.firstName || ''} ${c.lastName || ''} | ${c.email || ''} | ${c.companyName || ''} | Tags: ${tags}${updated ? ` | Updated: ${updated}` : ''} | ID: ${c.id}`
+      }).join('\n')
     }
 
     default:

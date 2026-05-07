@@ -10,12 +10,13 @@ import { calendlyTools, execCalendlyTool } from '@/lib/tools/calendly'
 import { zoomTools, execZoomTool } from '@/lib/tools/zoom'
 import { ghlTools, execGhlTool } from '@/lib/tools/ghl'
 import { microsoftTools, execMicrosoftTool } from '@/lib/tools/microsoft'
+import { productivityTools, execProductivityTool } from '@/lib/tools/productivity'
 import { parseSkillFromMessage, SKILLS } from '@/lib/skills'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const MODEL = 'claude-sonnet-4-6'
 
-const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...ghlTools, ...gmailTools, ...calendarTools, ...microsoftTools, ...calendlyTools, ...zoomTools]
+const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...ghlTools, ...gmailTools, ...calendarTools, ...microsoftTools, ...calendlyTools, ...zoomTools, ...productivityTools]
 
 const BASE_SYSTEM = `You are the AI Virtual Assistant for Dr. Siamak Goudarzi, Founder of Nexter AI Group — a legal AI strategist, international counsel, and entrepreneur.
 
@@ -32,10 +33,15 @@ You are not a chatbot. You are a proactive executive assistant with full access 
 - Local filesystem and terminal
 
 ## How to Behave
-- Act first, explain after. Use tools proactively without being asked.
+- TOOLS FIRST. When asked for any data (leads, emails, contacts, calendar, tasks, pipeline), call the tool IMMEDIATELY. Do not write any text before calling the tool. Tool call first, explanation after.
+- When asked for hot leads, warm leads, clients, or any contacts by type: call ghl_list_contacts_by_tag with the tag. Do not say anything before calling it.
+- When asked about emails: call gmail_read_inbox immediately.
+- When asked about calendar/meetings: call calendar_list_events immediately.
+- When a contact is mentioned: call ghl_search_contacts immediately.
 - When someone books a Calendly call: create a Zoom meeting, add it to Google Calendar, send the invitee a confirmation email with the Zoom link, add/update them in GHL CRM.
-- When asked about emails or meetings: fetch the data immediately, don't ask for confirmation.
-- When a contact is mentioned: look them up in GHL automatically.
+- When asked to show Calendly contacts or all people who booked: ALWAYS call calendly_list_contacts — every time, even if you think you already have the data. Never answer from memory for contact lists. NEVER call calendly_get_invitee in a loop — it causes rate limit 429 errors.
+- When calendly_list_contacts returns results: output the numbered list EXACTLY as the tool returned it. Do NOT regroup into "upcoming/recent/older" sections. Do NOT hide contacts. Do NOT summarize. Show every single line the tool returned.
+- When asked to sync Calendly to CRM: call calendly_sync_to_crm IMMEDIATELY.
 - After any action (send email, create task, update CRM): confirm what was done with specifics.
 - Surface things that need attention even when not asked: stale follow-ups, unanswered emails, upcoming meetings with no prep.
 
@@ -72,7 +78,6 @@ export async function POST(req: NextRequest) {
       if (att.type.startsWith('image/')) {
         userContent.push({ type: 'image', source: { type: 'base64', media_type: att.type, data: att.data } })
       } else {
-        // Text file — decode and include as text
         const text = Buffer.from(att.data, 'base64').toString('utf-8')
         userContent.push({ type: 'text', text: `[File: ${att.name}]\n${text}` })
       }
@@ -80,8 +85,13 @@ export async function POST(req: NextRequest) {
   }
   userContent.push({ type: 'text', text: cleanMessage || message })
 
+  // Use history sent by the frontend (current session only — no cross-session bleed)
+  const sessionHistory = (history as Array<{ role: string; content: string }>)
+    .slice(-20)
+    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+
   const messages: Anthropic.MessageParam[] = [
-    ...history.slice(-20),
+    ...sessionHistory,
     { role: 'user', content: userContent.length === 1 && userContent[0].type === 'text' ? userContent[0].text : (userContent as Anthropic.MessageParam['content']) },
   ]
 
@@ -100,12 +110,14 @@ export async function POST(req: NextRequest) {
         await write({ type: 'skill', skill: { trigger: skill.trigger, label: skill.label, icon: skill.icon } })
       }
 
-      while (true) {
+      let iterations = 0
+      while (iterations++ < 8) {
         const response = await anthropic.messages.create({
           model: MODEL,
           max_tokens: 8096,
           system: systemPrompt,
           tools: ALL_TOOLS,
+          tool_choice: { type: 'auto' },
           messages,
           stream: true,
         })
@@ -183,11 +195,13 @@ export async function POST(req: NextRequest) {
             result = await execCalendlyTool(tu.name, parsedInput)
           } else if (zoomTools.find((t) => t.name === tu.name)) {
             result = await execZoomTool(tu.name, parsedInput)
+          } else if (productivityTools.find((t) => t.name === tu.name)) {
+            result = await execProductivityTool(tu.name, parsedInput)
           } else {
             result = `Unknown tool: ${tu.name}`
           }
 
-          await write({ type: 'tool_result', tool: tu.name, result: result.slice(0, 500) })
+          await write({ type: 'tool_result', tool: tu.name, result: result.slice(0, 200) })
           toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: result })
         }
 

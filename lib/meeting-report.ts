@@ -6,12 +6,10 @@
 import { google } from 'googleapis'
 import { getAuthedClient } from '@/lib/google'
 import Anthropic from '@anthropic-ai/sdk'
-import path from 'path'
-import fs from 'fs/promises'
+import { addTask, getOpenTasksText, saveMeetingReport } from '@/lib/supabase'
 
 const MEETINGS_FOLDER_NAME = 'Nexter AI — Meeting Reports'
 const TO = process.env.BRIEFING_EMAIL || process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
-const TASKS_FILE = () => path.join(process.cwd(), 'tasks', 'open.md')
 
 // ─── TASK EXTRACTION ──────────────────────────────────────────────────────────
 
@@ -40,39 +38,20 @@ Return [] if no action items found.`,
     const tasks: { task: string; owner: string; deadline: string; priority: string }[] = JSON.parse(match[0])
     if (!tasks.length) return
 
-    const dir = path.join(process.cwd(), 'tasks')
-    await fs.mkdir(dir, { recursive: true })
-
-    const lines = [`\n## ${date} — ${meetingTitle}\n`]
     for (const t of tasks) {
-      lines.push(`- [ ] [${t.priority}] ${t.task} (${t.owner} · ${t.deadline})`)
+      await addTask(`[${t.priority}] ${t.task} (${t.owner} · ${t.deadline})`, {
+        source: 'meeting',
+        contact_name: meetingTitle,
+      })
     }
-    lines.push('')
-
-    await fs.appendFile(TASKS_FILE(), lines.join('\n'), 'utf-8')
   } catch (err) {
     console.error('[meeting-report] Task extraction error:', err)
   }
 }
 
-export async function getOpenTasks(): Promise<string> {
-  try {
-    const content = await fs.readFile(TASKS_FILE(), 'utf-8')
-    const lines = content.split('\n').filter(l => l.includes('- [ ]'))
-    if (!lines.length) return ''
-    return lines.slice(0, 10).join('\n')
-  } catch {
-    return ''
-  }
-}
-
-export async function markTaskDone(taskText: string): Promise<void> {
-  try {
-    const content = await fs.readFile(TASKS_FILE(), 'utf-8')
-    const updated = content.replace(`- [ ] ${taskText}`, `- [x] ${taskText}`)
-    await fs.writeFile(TASKS_FILE(), updated, 'utf-8')
-  } catch { /* ignore */ }
-}
+// Re-export from supabase for backwards compatibility
+export { getOpenTasksText as getOpenTasks }
+export { markTaskDone } from '@/lib/supabase'
 
 // ─── CLAUDE SUMMARY ──────────────────────────────────────────────────────────
 
@@ -185,16 +164,34 @@ export async function saveMeetingToDrive(
   }
 }
 
-// ─── LOCAL FILE BACKUP ────────────────────────────────────────────────────────
+// Save to both Google Drive and Supabase
+export async function saveMeeting(opts: {
+  title: string
+  date: string
+  attendees: string
+  summary: string
+  contactName?: string
+  contactEmail?: string
+}): Promise<string | null> {
+  const content = `${opts.title}\n${opts.date}\nAttendees: ${opts.attendees}\n\n${opts.summary}`
+  const driveUrl = await saveMeetingToDrive(opts.title, content, opts.date)
+  await saveMeetingReport({
+    title: opts.title,
+    date: opts.date,
+    attendees: opts.attendees,
+    summary: opts.summary,
+    action_items: '',
+    drive_url: driveUrl || undefined,
+    contact_name: opts.contactName,
+    contact_email: opts.contactEmail,
+  })
+  return driveUrl
+}
 
-export async function saveMeetingLocally(filename: string, content: string): Promise<void> {
-  try {
-    const dir = path.join(process.cwd(), 'meetings')
-    await fs.mkdir(dir, { recursive: true })
-    await fs.writeFile(path.join(dir, filename), content, 'utf-8')
-  } catch (err) {
-    console.error('[meeting-report] Local save error:', err)
-  }
+// ─── LOCAL FILE BACKUP (no-op — data saved to Supabase + Drive) ──────────────
+
+export async function saveMeetingLocally(_filename: string, _content: string): Promise<void> {
+  // no-op — meetings now saved to Supabase and Google Drive
 }
 
 // ─── GHL CRM ─────────────────────────────────────────────────────────────────
