@@ -722,42 +722,155 @@ export default function StudioPage() {
 
   // ─── Support ───────────────────────────────────────────────────────────────
   function ViewSupport() {
-    const faqs = [
-      { q:'How do I connect a new email account?', a:'Go to Connections → click "+ Add" next to Gmail or Outlook → follow the OAuth flow. Takes under 30 seconds.' },
-      { q:'How do I activate a workflow?',          a:'Go to Workflows → find the workflow → toggle the switch to Active. It runs automatically from that point.' },
-      { q:'Can I use the AI in multiple languages?', a:'Yes — the AI understands and responds in any language. Just write in your preferred language.' },
-      { q:'Where are my conversations stored?',     a:'Conversations are stored securely in Supabase (your own database). You control your data.' },
-      { q:'How do I get a morning briefing?',        a:'Ask: "Give me my morning briefing" or click Morning Brief in Dashboard Quick Actions.' },
+    const [activeGuide, setActiveGuide] = useState<string|null>(null)
+
+    const setupSteps = [
+      {
+        id:'anthropic', icon:'🤖', title:'Step 1 — Get Your Claude API Key',
+        time:'5 min', required:true,
+        steps:[
+          'Go to console.anthropic.com and create an account',
+          'Click "Get API Keys" → Create new key → copy it',
+          'Send the key to your Nexter AI setup contact',
+          'This key is private — never share it publicly',
+          'You are billed directly by Anthropic based on usage',
+        ],
+        link:'https://console.anthropic.com',linkLabel:'Open Anthropic Console ↗',
+      },
+      {
+        id:'gmail', icon:'📧', title:'Step 2 — Connect Gmail',
+        time:'3 min', required:true,
+        steps:[
+          'In this app, go to Connections → click "Connect" next to Gmail',
+          'Sign in with your Google account and allow the requested permissions',
+          'The app needs: read emails, send emails, read calendar',
+          'Once connected, the green dot appears — the AI can now read and send email on your behalf',
+          'To disconnect at any time: Google Account → Security → Third-party access',
+        ],
+        link:'https://myaccount.google.com/permissions',linkLabel:'Manage Google Permissions ↗',
+      },
+      {
+        id:'outlook', icon:'💼', title:'Step 3 — Connect Microsoft Outlook (optional)',
+        time:'3 min', required:false,
+        steps:[
+          'In Connections → click "Connect" next to Microsoft Outlook',
+          'Sign in with your Microsoft 365 account',
+          'The app reads both your Outlook inbox and your Outlook Calendar',
+          'If you use both Gmail and Outlook, the AI checks both automatically',
+        ],
+        link:'https://myaccount.microsoft.com',linkLabel:'Manage Microsoft Permissions ↗',
+      },
+      {
+        id:'ghl', icon:'🏢', title:'Step 4 — Connect GHL CRM (optional)',
+        time:'5 min', required:false,
+        steps:[
+          'Log into your Go High Level account',
+          'Go to Settings → Integrations → Private Integrations',
+          'Create a new integration and copy the token (starts with pit-...)',
+          'Also copy your Location ID from Settings → Business Info',
+          'Send both to your Nexter AI setup contact to add to the system',
+        ],
+        link:'https://app.gohighlevel.com',linkLabel:'Open GHL ↗',
+      },
+      {
+        id:'zoom', icon:'📹', title:'Step 5 — Connect Zoom (optional)',
+        time:'5 min', required:false,
+        steps:[
+          'Go to marketplace.zoom.us → Build App → Server-to-Server OAuth',
+          'Create an app, copy Account ID, Client ID, and Client Secret',
+          'Enable scopes: meeting:write, meeting:read, cloud_recording:read',
+          'Send credentials to your Nexter AI setup contact',
+          'Once connected, the AI can create Zoom meetings and read recording summaries',
+        ],
+        link:'https://marketplace.zoom.us',linkLabel:'Open Zoom Marketplace ↗',
+      },
+      {
+        id:'calendly', icon:'📅', title:'Step 6 — Connect Calendly (optional)',
+        time:'2 min', required:false,
+        steps:[
+          'Log into Calendly → Integrations → API & Webhooks',
+          'Create a Personal Access Token and copy it',
+          'Send to your Nexter AI setup contact',
+          'The AI will sync booking contacts directly to your CRM',
+        ],
+        link:'https://calendly.com/integrations/api_webhooks',linkLabel:'Open Calendly API ↗',
+      },
     ]
+
+    const faqs = [
+      { q:'How do I activate a workflow?',           a:'Go to Workflows → find the workflow → toggle the switch. It runs automatically from that point forward.' },
+      { q:'Can I use the AI in multiple languages?', a:'Yes. Just write in your preferred language — the AI responds in the same language.' },
+      { q:'Where are my conversations stored?',      a:'Conversations are stored securely in your own private database. No data is shared with other clients.' },
+      { q:'How do I get a morning briefing?',        a:'Ask: "Give me my morning briefing" or click Morning Brief in Dashboard Quick Actions. It pulls email, calendar, and leads together.' },
+      { q:'What does the AI cost me?',               a:'You pay Anthropic directly per message. Typical usage costs $5–30/month depending on volume. You control your own API key and budget.' },
+      { q:'Can I request custom workflows?',         a:'Yes. Contact info@i-review.ai describing what you need. Custom workflows are built and added to your instance.' },
+      { q:'How do I disconnect a service?',          a:'Go to the service settings (e.g. Google Account → Security → Third-party access) and remove the app. The connection will stop immediately.' },
+    ]
+
     return (
-      <div style={{maxWidth:700,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
-        <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Support</h1>
-        <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Get help, find answers, or reach the team.</p>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:28}}>
+      <div style={{maxWidth:780,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
+        <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Help Center</h1>
+        <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Setup guides, FAQs, and how to reach us.</p>
+
+        {/* Contact cards */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:32}}>
           {[
-            {icon:'📖',label:'Documentation',   desc:'Guides and how-tos',              action:()=>window.open('https://nexteraigroup.com','_blank','noopener')},
-            {icon:'🎥',label:'Video Tutorials',  desc:'Step-by-step walkthroughs',       action:()=>window.open('https://nexteraigroup.com','_blank','noopener')},
-            {icon:'💬',label:'WhatsApp Support', desc:'Quick reply via WhatsApp',        action:()=>window.open('https://wa.me/message/yournumber','_blank','noopener')},
-            {icon:'📧',label:'Email Support',    desc:'info@i-review.ai',               action:()=>window.location.href='mailto:info@i-review.ai?subject=VA App Support'},
+            {icon:'📧',label:'Email Support',    desc:'info@i-review.ai',        action:()=>{ window.location.href='mailto:info@i-review.ai?subject=VA App Support' }},
+            {icon:'💬',label:'WhatsApp',         desc:'Quick reply, usually same day', action:()=>window.open('https://wa.me/message/placeholder','_blank','noopener')},
           ].map(item=>(
             <button key={item.label} onClick={item.action}
-              style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'18px',textAlign:'left',cursor:'pointer',boxShadow:T.shadowsm,transition:'all 0.15s'}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.transform='translateY(-2px)'}}
+              style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 18px',textAlign:'left',cursor:'pointer',boxShadow:T.shadowsm,transition:'all 0.15s',display:'flex',alignItems:'center',gap:14}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.transform='translateY(-1px)'}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=T.cardBord;e.currentTarget.style.transform='translateY(0)'}}>
-              <span style={{fontSize:24,display:'block',marginBottom:8}}>{item.icon}</span>
-              <p style={{margin:'0 0 3px',fontSize:13,fontWeight:600,color:T.text}}>{item.label}</p>
-              <p style={{margin:0,fontSize:12,color:T.textmd}}>{item.desc}</p>
+              <span style={{fontSize:28}}>{item.icon}</span>
+              <div>
+                <p style={{margin:'0 0 2px',fontSize:13,fontWeight:600,color:T.text}}>{item.label}</p>
+                <p style={{margin:0,fontSize:12,color:T.textmd}}>{item.desc}</p>
+              </div>
             </button>
           ))}
         </div>
-        <p style={{margin:'0 0 12px',fontSize:12,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Frequently Asked Questions</p>
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+
+        {/* Setup Guide */}
+        <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Setup Guide — Connect Your Tools</p>
+        <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:28}}>
+          {setupSteps.map(step=>(
+            <div key={step.id} style={{background:T.card,border:`1px solid ${activeGuide===step.id?T.goldbrdr:T.cardBord}`,borderRadius:12,overflow:'hidden',boxShadow:T.shadowsm,transition:'all 0.15s'}}>
+              <button onClick={()=>setActiveGuide(activeGuide===step.id?null:step.id)}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 18px',background:'none',border:'none',cursor:'pointer',textAlign:'left'}}>
+                <span style={{fontSize:20,flexShrink:0}}>{step.icon}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{step.title}</p>
+                  <p style={{margin:'2px 0 0',fontSize:11,color:T.textdim,fontFamily:MONO}}>~{step.time} · {step.required?'Recommended':'Optional'}</p>
+                </div>
+                <span style={{fontSize:16,color:T.textdim,transition:'transform 0.2s',transform:activeGuide===step.id?'rotate(180deg)':'rotate(0deg)',display:'inline-block'}}>›</span>
+              </button>
+              {activeGuide===step.id && (
+                <div style={{padding:'0 18px 16px',borderTop:`1px solid ${T.divider}`}}>
+                  <ol style={{margin:'12px 0 0',paddingLeft:20,display:'flex',flexDirection:'column',gap:8}}>
+                    {step.steps.map((s,i)=>(
+                      <li key={i} style={{fontSize:13,color:T.textmd,lineHeight:1.6}}>{s}</li>
+                    ))}
+                  </ol>
+                  <a href={step.link} target="_blank" rel="noopener noreferrer"
+                    style={{display:'inline-block',marginTop:12,fontSize:12,color:T.gold,fontWeight:600,fontFamily:MONO,textDecoration:'none',border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'5px 12px',background:T.golddim}}>
+                    {step.linkLabel}
+                  </a>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* FAQ */}
+        <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Frequently Asked Questions</p>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
           {faqs.map((f,i)=>(
-            <details key={i} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:10,padding:'14px 18px',cursor:'pointer'}}>
+            <details key={i} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:10,padding:'13px 16px',cursor:'pointer'}}>
               <summary style={{fontSize:13,fontWeight:600,color:T.text,listStyle:'none',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                {f.q}<span style={{color:T.textdim,fontWeight:400}}>+</span>
+                {f.q}<span style={{color:T.textdim,fontWeight:400,marginLeft:8}}>+</span>
               </summary>
-              <p style={{margin:'10px 0 0',fontSize:13,color:T.textmd,lineHeight:1.6}}>{f.a}</p>
+              <p style={{margin:'10px 0 0',fontSize:13,color:T.textmd,lineHeight:1.65}}>{f.a}</p>
             </details>
           ))}
         </div>
