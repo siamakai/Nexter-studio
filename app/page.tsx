@@ -14,16 +14,14 @@ type Message     = { id: string; role: 'user' | 'assistant'; content: string; to
 type SessionMeta = { id: string; title: string; updated_at: string }
 
 // ─── Theme tokens ─────────────────────────────────────────────────────────────
-// Logo gold extracted from Nexter AI Group mark: #B8962A
-const LOGO_GOLD   = '#B8962A'
-const LOGO_NAVY   = '#1C2E4A'
+const LOGO_GOLD = '#B8963E'  // exact from nexter-ai-group-logo.svg
 
 function tokens(dark: boolean) {
   return dark ? {
     bg:       '#06080F',
     sidebar:  '#0C0E18',
-    sideHov:  'rgba(184,150,42,0.08)',
-    sideAct:  'rgba(184,150,42,0.13)',
+    sideHov:  'rgba(184,150,62,0.08)',
+    sideAct:  'rgba(184,150,62,0.13)',
     panel:    '#0A0C14',
     topbar:   '#09090F',
     compose:  '#0C0E18',
@@ -35,9 +33,9 @@ function tokens(dark: boolean) {
     textmd:   'rgba(237,232,224,0.58)',
     textdim:  'rgba(237,232,224,0.30)',
     gold:     LOGO_GOLD,
-    golddim:  'rgba(184,150,42,0.11)',
-    goldbrdr: 'rgba(184,150,42,0.28)',
-    goldglo:  'rgba(184,150,42,0.32)',
+    golddim:  'rgba(184,150,62,0.11)',
+    goldbrdr: 'rgba(184,150,62,0.28)',
+    goldglo:  'rgba(184,150,62,0.32)',
     green:    '#22C55E',
     blue:     '#3B82F6',
     red:      '#EF4444',
@@ -50,8 +48,8 @@ function tokens(dark: boolean) {
   } : {
     bg:       '#F7F5F1',
     sidebar:  '#FFFFFF',
-    sideHov:  'rgba(184,150,42,0.06)',
-    sideAct:  'rgba(184,150,42,0.11)',
+    sideHov:  'rgba(184,150,62,0.06)',
+    sideAct:  'rgba(184,150,62,0.11)',
     panel:    '#F2EFEA',
     topbar:   '#FFFFFF',
     compose:  '#FFFFFF',
@@ -106,19 +104,19 @@ const NAV_BOT: { id: View; icon: string; label: string }[] = [
   { id:'support',  icon:'🆘', label:'Support' },
 ]
 
-const CONNECTIONS = [
-  { id:'gmail',    name:'Gmail',            icon:'📧', desc:'Primary inbox · info@i-review.ai',           color:'#EA4335', connected:true  },
-  { id:'outlook',  name:'Microsoft Outlook',icon:'💼', desc:'siamak.goudarzi@nexterlaw.com',               color:'#0078D4', connected:true  },
-  { id:'gcal',     name:'Google Calendar',  icon:'📅', desc:'Personal & business events',                  color:'#4285F4', connected:true  },
-  { id:'ghl',      name:'GHL CRM',          icon:'🏢', desc:'Contacts, pipeline, tasks, tags',             color:'#F59E0B', connected:true  },
-  { id:'calendly', name:'Calendly',         icon:'📞', desc:'Booking pages & invitee sync',                color:'#006BFF', connected:true  },
-  { id:'zoom',     name:'Zoom',             icon:'📹', desc:'Cloud-recorded meetings',                     color:'#2D8CFF', connected:true  },
-  { id:'salesforce',name:'Salesforce',      icon:'☁️', desc:'Enterprise CRM integration',                  color:'#00A1E0', connected:false },
-  { id:'hubspot',  name:'HubSpot',          icon:'🟠', desc:'Marketing & sales hub',                       color:'#FF7A59', connected:false },
-  { id:'slack',    name:'Slack',            icon:'💬', desc:'Team messaging & notifications',              color:'#4A154B', connected:false },
-  { id:'drive',    name:'Google Drive',     icon:'💾', desc:'Files, docs & cloud storage',                  color:'#34A853', connected:false },
-  { id:'whatsapp', name:'WhatsApp Business',icon:'📱', desc:'Client messaging channel',                    color:'#25D366', connected:false },
-  { id:'linkedin', name:'LinkedIn',         icon:'🔗', desc:'Professional network outreach',               color:'#0A66C2', connected:false },
+const CONNECTIONS: { id:string; name:string; icon:string; desc:string; color:string; connected:boolean; manageUrl:string; addUrl:string }[] = [
+  { id:'gmail',     name:'Gmail',             icon:'📧', desc:'Primary inbox · info@i-review.ai',         color:'#EA4335', connected:true,  manageUrl:'https://mail.google.com',            addUrl:'/api/auth/connect?service=google' },
+  { id:'outlook',   name:'Microsoft Outlook', icon:'💼', desc:'siamak.goudarzi@nexterlaw.com',             color:'#0078D4', connected:true,  manageUrl:'https://outlook.com',               addUrl:'/api/auth/microsoft/connect' },
+  { id:'gcal',      name:'Google Calendar',   icon:'📅', desc:'Personal & business events',               color:'#4285F4', connected:true,  manageUrl:'https://calendar.google.com',        addUrl:'/api/auth/connect?service=google' },
+  { id:'ghl',       name:'GHL CRM',           icon:'🏢', desc:'Contacts, pipeline, tasks, tags',          color:'#F59E0B', connected:true,  manageUrl:'https://app.gohighlevel.com',        addUrl:'https://app.gohighlevel.com' },
+  { id:'calendly',  name:'Calendly',          icon:'📞', desc:'Booking pages & invitee sync',             color:'#006BFF', connected:true,  manageUrl:'https://calendly.com/app',           addUrl:'https://calendly.com' },
+  { id:'zoom',      name:'Zoom',              icon:'📹', desc:'Cloud-recorded meetings',                  color:'#2D8CFF', connected:true,  manageUrl:'https://zoom.us/profile',            addUrl:'https://zoom.us' },
+  { id:'salesforce',name:'Salesforce',        icon:'☁️', desc:'Enterprise CRM integration',              color:'#00A1E0', connected:false, manageUrl:'https://login.salesforce.com',       addUrl:'https://login.salesforce.com' },
+  { id:'hubspot',   name:'HubSpot',           icon:'🟠', desc:'Marketing & sales hub',                   color:'#FF7A59', connected:false, manageUrl:'https://app.hubspot.com',            addUrl:'https://app.hubspot.com/oauth/authorize' },
+  { id:'slack',     name:'Slack',             icon:'💬', desc:'Team messaging & notifications',           color:'#4A154B', connected:false, manageUrl:'https://slack.com',                  addUrl:'https://slack.com/oauth/v2/authorize' },
+  { id:'drive',     name:'Google Drive',      icon:'💾', desc:'Files, docs & cloud storage',             color:'#34A853', connected:false, manageUrl:'https://drive.google.com',           addUrl:'/api/auth/connect?service=google' },
+  { id:'whatsapp',  name:'WhatsApp Business', icon:'📱', desc:'Client messaging channel',               color:'#25D366', connected:false, manageUrl:'https://business.facebook.com',      addUrl:'https://business.whatsapp.com/get-started' },
+  { id:'linkedin',  name:'LinkedIn',          icon:'🔗', desc:'Professional network outreach',          color:'#0A66C2', connected:false, manageUrl:'https://www.linkedin.com/company-admin', addUrl:'https://www.linkedin.com/developers/apps' },
 ]
 
 const WORKFLOWS = [
@@ -153,23 +151,13 @@ const DONE_LOG = [
 const WELCOME: Message = { id: '0', role: 'assistant', content: '__WELCOME__' }
 function newId() { return `${Date.now()}-${Math.random().toString(36).slice(2,7)}` }
 
-// ─── Nexter AI Group logo mark ────────────────────────────────────────────────
+// ─── Nexter AI Group logo mark (exact from nexter-ai-group-logo.svg) ────────
 function LogoMark({ size = 32 }: { size?: number }) {
-  const r = Math.round(size * 0.19)   // border-radius proportional
-  const pad = Math.round(size * 0.09)
-  const frame = Math.round(size * 0.16)
-  const fs = Math.round(size * 0.52)
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" style={{flexShrink:0,borderRadius:r,display:'block'}}>
-      {/* Navy outer */}
-      <rect width="100" height="100" fill={LOGO_NAVY} rx={r*3}/>
-      {/* Gold inner square */}
-      <rect x={pad} y={pad} width={100-pad*2} height={100-pad*2} fill={LOGO_GOLD}/>
-      {/* White frame border */}
-      <rect x={frame} y={frame} width={100-frame*2} height={100-frame*2} fill="none" stroke="white" strokeWidth="3"/>
-      {/* White N serif */}
-      <text x="50" y="70" fontFamily="Georgia,'Times New Roman',serif" fontSize={fs} fontWeight="700" fill="white" textAnchor="middle"
-        style={{letterSpacing:'-1px'}}>N</text>
+    <svg width={size} height={size} viewBox="0 0 84 84" style={{flexShrink:0,display:'block'}}>
+      <rect width="84" height="84" fill={LOGO_GOLD}/>
+      <rect x="7" y="7" width="70" height="70" fill="none" stroke="#ffffff" strokeWidth="2"/>
+      <text x="42" y="66" fontFamily="Georgia,'Times New Roman',serif" fontSize="52" fontWeight="700" fill="#ffffff" textAnchor="middle">N</text>
     </svg>
   )
 }
@@ -442,7 +430,8 @@ export default function StudioPage() {
             <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Workflows</h1>
             <p style={{margin:0,fontSize:14,color:T.textmd}}>Automated sequences that run in the background, 24/7.</p>
           </div>
-          <button style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>+ New Workflow</button>
+          <button onClick={()=>send('I want to create a new workflow. Walk me through the options.')}
+            style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>+ New Workflow</button>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {WORKFLOWS.map(w=>(
@@ -475,7 +464,8 @@ export default function StudioPage() {
             <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>AI Agents</h1>
             <p style={{margin:0,fontSize:14,color:T.textmd}}>Specialized AI assistants — activate the ones you need.</p>
           </div>
-          <button style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>+ New Agent</button>
+          <button onClick={()=>send('I want to create a new AI agent. What options do I have?')}
+            style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>+ New Agent</button>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
           {AGENTS.map(a=>(
@@ -506,6 +496,7 @@ export default function StudioPage() {
   function ViewConnections() {
     const connected = CONNECTIONS.filter(c=>c.connected)
     const available = CONNECTIONS.filter(c=>!c.connected)
+    const open = (url: string) => window.open(url, '_blank', 'noopener')
     return (
       <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
         <div style={{marginBottom:28}}>
@@ -525,7 +516,12 @@ export default function StudioPage() {
               <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
                 <div style={{width:6,height:6,borderRadius:'50%',background:T.green}}/>
                 <span style={{fontSize:11,color:T.green,fontFamily:MONO,fontWeight:600}}>Connected</span>
-                <button style={{fontSize:11,color:T.textdim,background:'none',border:`1px solid ${T.border}`,borderRadius:6,padding:'4px 10px',cursor:'pointer',fontFamily:MONO}}>Manage</button>
+                <button onClick={()=>open(c.manageUrl)}
+                  style={{fontSize:11,color:T.textdim,background:'none',border:`1px solid ${T.border}`,borderRadius:6,padding:'4px 10px',cursor:'pointer',fontFamily:MONO,transition:'all 0.12s'}}
+                  onMouseEnter={e=>{e.currentTarget.style.color=T.gold;e.currentTarget.style.borderColor=T.goldbrdr}}
+                  onMouseLeave={e=>{e.currentTarget.style.color=T.textdim;e.currentTarget.style.borderColor=T.border}}>
+                  Manage ↗
+                </button>
               </div>
             </div>
           ))}
@@ -534,15 +530,19 @@ export default function StudioPage() {
         <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Available — click to connect</p>
         <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
           {available.map(c=>(
-            <div key={c.id} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 18px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',opacity:0.7,transition:'all 0.15s'}}
+            <div key={c.id} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 18px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',opacity:0.8,transition:'all 0.15s'}}
+              onClick={()=>open(c.addUrl)}
               onMouseEnter={e=>{e.currentTarget.style.opacity='1';e.currentTarget.style.borderColor=T.goldbrdr}}
-              onMouseLeave={e=>{e.currentTarget.style.opacity='0.7';e.currentTarget.style.borderColor=T.cardBord}}>
+              onMouseLeave={e=>{e.currentTarget.style.opacity='0.8';e.currentTarget.style.borderColor=T.cardBord}}>
               <span style={{fontSize:20,flexShrink:0}}>{c.icon}</span>
               <div style={{flex:1,minWidth:0}}>
                 <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{c.name}</p>
                 <p style={{margin:'1px 0 0',fontSize:11,color:T.textmd,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.desc}</p>
               </div>
-              <button style={{fontSize:11,color:T.gold,background:T.golddim,border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'5px 12px',cursor:'pointer',fontFamily:MONO,fontWeight:600,flexShrink:0}}>+ Add</button>
+              <button onClick={e=>{e.stopPropagation();open(c.addUrl)}}
+                style={{fontSize:11,color:T.gold,background:T.golddim,border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'5px 12px',cursor:'pointer',fontFamily:MONO,fontWeight:600,flexShrink:0}}>
+                + Connect
+              </button>
             </div>
           ))}
         </div>
@@ -553,34 +553,69 @@ export default function StudioPage() {
   // ─── Docs ──────────────────────────────────────────────────────────────────
   function ViewDocs() {
     const folders = ['Contracts', 'Proposals', 'Meeting Notes', 'Templates', 'Reports']
+    const docsFileRef = useRef<HTMLInputElement>(null)
+    const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
+    function handleDocFiles(files: FileList | null) {
+      if (!files) return
+      const names = Array.from(files).map(f => f.name)
+      setUploadedFiles(p => [...p, ...names])
+    }
     return (
       <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
+        <input ref={docsFileRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg" style={{display:'none'}} onChange={e=>handleDocFiles(e.target.files)}/>
         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:28}}>
           <div>
             <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Docs</h1>
             <p style={{margin:0,fontSize:14,color:T.textmd}}>Upload documents and reference them in any AI conversation.</p>
           </div>
           <div style={{display:'flex',gap:8}}>
-            <button style={{background:'transparent',color:T.textmd,border:`1px solid ${T.border}`,borderRadius:8,padding:'9px 16px',cursor:'pointer',fontSize:13,fontWeight:600}}>Connect Drive</button>
-            <button style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>+ Upload</button>
+            <button onClick={()=>window.open('https://drive.google.com','_blank','noopener')}
+              style={{background:'transparent',color:T.textmd,border:`1px solid ${T.border}`,borderRadius:8,padding:'9px 16px',cursor:'pointer',fontSize:13,fontWeight:600,transition:'all 0.12s'}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.color=T.text}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.textmd}}>
+              💾 Open Drive ↗
+            </button>
+            <button onClick={()=>docsFileRef.current?.click()}
+              style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>
+              + Upload
+            </button>
           </div>
         </div>
+        {uploadedFiles.length > 0 && (
+          <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:10,padding:'14px 18px',marginBottom:16,boxShadow:T.shadowsm}}>
+            <p style={{margin:'0 0 8px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Uploaded this session</p>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {uploadedFiles.map((f,i)=>(
+                <span key={i} style={{fontSize:12,background:T.golddim,color:T.gold,border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'3px 10px',fontFamily:MONO}}>📄 {f}</span>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:24}}>
           {folders.map(f=>(
-            <div key={f} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'18px',cursor:'pointer',transition:'all 0.15s',boxShadow:T.shadowsm}}
+            <div key={f} onClick={()=>docsFileRef.current?.click()}
+              style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'18px',cursor:'pointer',transition:'all 0.15s',boxShadow:T.shadowsm}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.transform='translateY(-2px)'}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=T.cardBord;e.currentTarget.style.transform='translateY(0)'}}>
               <span style={{fontSize:28,display:'block',marginBottom:8}}>📁</span>
               <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{f}</p>
-              <p style={{margin:'3px 0 0',fontSize:11,color:T.textdim}}>0 documents</p>
+              <p style={{margin:'3px 0 0',fontSize:11,color:T.textdim}}>0 documents · click to upload</p>
             </div>
           ))}
         </div>
-        <div style={{background:T.card,border:`2px dashed ${T.border}`,borderRadius:12,padding:'40px',textAlign:'center'}}>
+        <div
+          onDragOver={e=>e.preventDefault()}
+          onDrop={e=>{e.preventDefault();handleDocFiles(e.dataTransfer.files)}}
+          style={{background:T.card,border:`2px dashed ${T.border}`,borderRadius:12,padding:'40px',textAlign:'center',cursor:'pointer',transition:'border-color 0.15s'}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=T.goldbrdr}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
           <span style={{fontSize:36,display:'block',marginBottom:12}}>☁️</span>
-          <p style={{margin:'0 0 6px',fontSize:15,fontWeight:600,color:T.text}}>Drop files here to upload</p>
+          <p style={{margin:'0 0 6px',fontSize:15,fontWeight:600,color:T.text}}>Drop files here or click to upload</p>
           <p style={{margin:'0 0 16px',fontSize:13,color:T.textmd}}>PDF, Word, Excel, images · Max 25MB per file</p>
-          <button style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 20px',cursor:'pointer',fontSize:13,fontWeight:600}}>Choose files</button>
+          <button onClick={()=>docsFileRef.current?.click()}
+            style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 20px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>
+            Choose files
+          </button>
         </div>
       </div>
     )
@@ -635,24 +670,39 @@ export default function StudioPage() {
 
   // ─── Feedback ──────────────────────────────────────────────────────────────
   function ViewFeedback() {
+    const emojis = ['😞','😐','🙂','😊','🤩']
+    const [rating, setRating] = useState(-1)
+    function sendFeedback() {
+      if (!feedbackText.trim()) return
+      const ratingLabel = rating >= 0 ? `Rating: ${emojis[rating]} (${rating+1}/5)\n\n` : ''
+      const subject = encodeURIComponent('VA App Feedback')
+      const body = encodeURIComponent(`${ratingLabel}${feedbackText}`)
+      window.location.href = `mailto:info@i-review.ai?subject=${subject}&body=${body}`
+      setFeedbackSent(true)
+    }
     return (
       <div style={{maxWidth:600,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
         <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Feedback</h1>
-        <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Help us improve VA App.</p>
+        <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Help us improve VA App. Sent directly to info@i-review.ai.</p>
         {feedbackSent ? (
           <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'48px',textAlign:'center',boxShadow:T.shadowsm}}>
             <span style={{fontSize:40,display:'block',marginBottom:12}}>🙏</span>
-            <p style={{margin:'0 0 6px',fontSize:16,fontWeight:700,color:T.text}}>Thank you for your feedback!</p>
-            <p style={{margin:0,fontSize:14,color:T.textmd}}>Siamak reviews all submissions personally.</p>
+            <p style={{margin:'0 0 6px',fontSize:16,fontWeight:700,color:T.text}}>Thank you!</p>
+            <p style={{margin:'0 0 16px',fontSize:14,color:T.textmd}}>Your feedback is on its way to info@i-review.ai.</p>
+            <button onClick={()=>{setFeedbackSent(false);setFeedbackText('');setRating(-1)}}
+              style={{fontSize:13,color:T.gold,background:'none',border:`1px solid ${T.goldbrdr}`,borderRadius:8,padding:'8px 20px',cursor:'pointer'}}>
+              Send more feedback
+            </button>
           </div>
         ) : (
           <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'24px',boxShadow:T.shadowsm}}>
-            <p style={{margin:'0 0 6px',fontSize:13,fontWeight:600,color:T.textmd}}>How would you rate your experience?</p>
+            <p style={{margin:'0 0 8px',fontSize:13,fontWeight:600,color:T.textmd}}>How would you rate your experience?</p>
             <div style={{display:'flex',gap:8,marginBottom:20}}>
-              {['😞','😐','🙂','😊','🤩'].map((e,i)=>(
-                <button key={i} style={{fontSize:24,background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'8px 14px',cursor:'pointer',transition:'all 0.12s'}}
-                  onMouseEnter={e2=>{e2.currentTarget.style.borderColor=T.goldbrdr;e2.currentTarget.style.background=T.golddim}}
-                  onMouseLeave={e2=>{e2.currentTarget.style.borderColor=T.border;e2.currentTarget.style.background='none'}}>
+              {emojis.map((e,i)=>(
+                <button key={i} onClick={()=>setRating(i)}
+                  style={{fontSize:24,background:rating===i?T.golddim:'none',border:`1px solid ${rating===i?T.goldbrdr:T.border}`,borderRadius:8,padding:'8px 14px',cursor:'pointer',transition:'all 0.12s',transform:rating===i?'scale(1.15)':'scale(1)'}}
+                  onMouseEnter={e2=>{if(rating!==i){e2.currentTarget.style.borderColor=T.goldbrdr;e2.currentTarget.style.background=T.golddim}}}
+                  onMouseLeave={e2=>{if(rating!==i){e2.currentTarget.style.borderColor=T.border;e2.currentTarget.style.background='none'}}}>
                   {e}
                 </button>
               ))}
@@ -660,9 +710,9 @@ export default function StudioPage() {
             <p style={{margin:'0 0 6px',fontSize:13,fontWeight:600,color:T.textmd}}>What&apos;s on your mind?</p>
             <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} placeholder="Feature request, bug report, or general thoughts…"
               style={{width:'100%',background:T.inputbg,border:`1px solid ${T.bordmd}`,borderRadius:8,padding:'12px 14px',fontSize:14,color:T.text,fontFamily:FONT,outline:'none',resize:'vertical',minHeight:100,marginBottom:14,boxSizing:'border-box'}}/>
-            <button onClick={()=>{if(feedbackText.trim())setFeedbackSent(true)}}
-              style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'10px 24px',cursor:'pointer',fontSize:14,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>
-              Send Feedback
+            <button onClick={sendFeedback} disabled={!feedbackText.trim()}
+              style={{background:feedbackText.trim()?T.gold:'transparent',color:feedbackText.trim()?'#fff':T.textdim,border:`1px solid ${feedbackText.trim()?T.gold:T.border}`,borderRadius:8,padding:'10px 24px',cursor:feedbackText.trim()?'pointer':'not-allowed',fontSize:14,fontWeight:600,boxShadow:feedbackText.trim()?`0 2px 8px ${T.goldglo}`:'none',transition:'all 0.15s'}}>
+              Send Feedback → info@i-review.ai
             </button>
           </div>
         )}
@@ -685,10 +735,10 @@ export default function StudioPage() {
         <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Get help, find answers, or reach the team.</p>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:28}}>
           {[
-            {icon:'📖',label:'Documentation',   desc:'Guides and how-tos',           action:()=>{}},
-            {icon:'🎥',label:'Video Tutorials',  desc:'Step-by-step walkthroughs',    action:()=>{}},
-            {icon:'💬',label:'Chat with Support',desc:'Message the Nexter AI team',   action:()=>send('I need help with the app')},
-            {icon:'📧',label:'Email Support',    desc:'support@nexteraigroup.com',    action:()=>{}},
+            {icon:'📖',label:'Documentation',   desc:'Guides and how-tos',              action:()=>window.open('https://nexteraigroup.com','_blank','noopener')},
+            {icon:'🎥',label:'Video Tutorials',  desc:'Step-by-step walkthroughs',       action:()=>window.open('https://nexteraigroup.com','_blank','noopener')},
+            {icon:'💬',label:'WhatsApp Support', desc:'Quick reply via WhatsApp',        action:()=>window.open('https://wa.me/message/yournumber','_blank','noopener')},
+            {icon:'📧',label:'Email Support',    desc:'info@i-review.ai',               action:()=>window.location.href='mailto:info@i-review.ai?subject=VA App Support'},
           ].map(item=>(
             <button key={item.label} onClick={item.action}
               style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'18px',textAlign:'left',cursor:'pointer',boxShadow:T.shadowsm,transition:'all 0.15s'}}
