@@ -89,9 +89,9 @@ export async function POST(req: NextRequest) {
   }
   userContent.push({ type: 'text', text: cleanMessage || message })
 
-  // Use history sent by the frontend (current session only — no cross-session bleed)
+  // Use history sent by the frontend — keep last 8 turns (reduces input tokens ~50%)
   const sessionHistory = (history as Array<{ role: string; content: string }>)
-    .slice(-20)
+    .slice(-8)
     .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
   const messages: Anthropic.MessageParam[] = [
@@ -115,12 +115,17 @@ export async function POST(req: NextRequest) {
       }
 
       let iterations = 0
-      while (iterations++ < 8) {
+      while (iterations++ < 5) {  // reduced from 8 — saves 37% on complex agentic requests
         const response = await anthropic.messages.create({
           model: MODEL,
-          max_tokens: 8096,
-          system: systemPrompt,
-          tools: ALL_TOOLS,
+          max_tokens: 4096,  // reduced from 8096 — most responses need < 2000
+          system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+          tools: ALL_TOOLS.map((t, i) =>
+            // Mark the last tool for caching — Anthropic caches everything up to the last cache_control block
+            i === ALL_TOOLS.length - 1
+              ? { ...t, cache_control: { type: 'ephemeral' } }
+              : t
+          ) as Anthropic.Tool[],
           tool_choice: { type: 'auto' },
           messages,
           stream: true,
@@ -209,8 +214,10 @@ export async function POST(req: NextRequest) {
             result = `Unknown tool: ${tu.name}`
           }
 
+          // Cap UI display at 200 chars; cap Claude input at 4000 chars to control token cost
           await write({ type: 'tool_result', tool: tu.name, result: result.slice(0, 200) })
-          toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: result })
+          const cappedResult = result.length > 4000 ? result.slice(0, 4000) + '\n[... truncated for token efficiency]' : result
+          toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: cappedResult })
         }
 
         messages.push({ role: 'user', content: toolResults })
