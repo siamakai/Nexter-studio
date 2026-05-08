@@ -11,12 +11,14 @@ import { zoomTools, execZoomTool } from '@/lib/tools/zoom'
 import { ghlTools, execGhlTool } from '@/lib/tools/ghl'
 import { microsoftTools, execMicrosoftTool } from '@/lib/tools/microsoft'
 import { productivityTools, execProductivityTool } from '@/lib/tools/productivity'
+import { whatsappTools, execWhatsAppTool } from '@/lib/tools/whatsapp'
+import { linkedinTools, execLinkedInTool } from '@/lib/tools/linkedin'
 import { parseSkillFromMessage, SKILLS } from '@/lib/skills'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const MODEL = 'claude-sonnet-4-6'
 
-const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...ghlTools, ...gmailTools, ...calendarTools, ...microsoftTools, ...calendlyTools, ...zoomTools, ...productivityTools]
+const ALL_TOOLS = [...filesystemTools, ...bashTools, ...memoryTools, ...webTools, ...ghlTools, ...gmailTools, ...calendarTools, ...microsoftTools, ...calendlyTools, ...zoomTools, ...productivityTools, ...whatsappTools, ...linkedinTools]
 
 const BASE_SYSTEM = `You are the AI Virtual Assistant for Dr. Siamak Goudarzi, Founder of Nexter AI Group — a legal AI strategist, international counsel, and entrepreneur.
 
@@ -29,6 +31,8 @@ You are not a chatbot. You are a proactive executive assistant with full access 
 - Go High Level CRM (contacts, pipeline, opportunities, tasks, notes)
 - Calendly (upcoming bookings and invitee details)
 - Zoom (create meetings, auto cloud-records every call, fetch past meeting summaries from meetings/ folder)
+- WhatsApp Business (read incoming messages, send messages, manage contacts)
+- LinkedIn (post content, get profile, get recent posts, search people)
 - Web browsing and research
 - Local filesystem and terminal
 
@@ -197,6 +201,10 @@ export async function POST(req: NextRequest) {
             result = await execZoomTool(tu.name, parsedInput)
           } else if (productivityTools.find((t) => t.name === tu.name)) {
             result = await execProductivityTool(tu.name, parsedInput)
+          } else if (whatsappTools.find((t) => t.name === tu.name)) {
+            result = await execWhatsAppTool(tu.name, parsedInput)
+          } else if (linkedinTools.find((t) => t.name === tu.name)) {
+            result = await execLinkedInTool(tu.name, parsedInput)
           } else {
             result = `Unknown tool: ${tu.name}`
           }

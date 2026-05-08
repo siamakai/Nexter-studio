@@ -86,6 +86,8 @@ const TOOL_LABELS: Record<string, string> = {
   zoom_create_meeting:'Creating Zoom', calendly_list_events:'Fetching Calendly',
   calendly_list_contacts:'Loading contacts', calendly_sync_to_crm:'Syncing to CRM',
   web_fetch:'Browsing web', save_memory:'Saving memory',
+  whatsapp_read_inbox:'Reading WhatsApp', whatsapp_send_message:'Sending WhatsApp', whatsapp_get_contacts:'Loading WA contacts', whatsapp_send_template:'Sending WA template',
+  linkedin_get_profile:'Reading LinkedIn', linkedin_create_post:'Posting to LinkedIn', linkedin_get_recent_posts:'Loading LinkedIn posts', linkedin_search_people:'Searching LinkedIn',
 }
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
