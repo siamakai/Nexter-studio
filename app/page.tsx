@@ -176,7 +176,6 @@ export default function StudioPage() {
   const [input,         setInput]         = useState('')
   const [streaming,     setStreaming]      = useState(false)
   const [showSkills,    setShowSkills]    = useState(false)
-  const [showSnippets,  setShowSnippets]  = useState(false)
   const [workspaceRoot, setWorkspaceRoot] = useState('')
   const [sideCollapsed, setSideCollapsed] = useState(false)
   const [wfState,       setWfState]       = useState<Record<string, boolean>>(
@@ -190,6 +189,17 @@ export default function StudioPage() {
   const [dateStr,       setDateStr]       = useState('')
   const [nowStr,        setNowStr]        = useState('')
   const [showMoreDrawer,setShowMoreDrawer]= useState(false)
+
+  // ── State lifted from view functions (required for function-call syntax) ────
+  const docsFileRef = useRef<HTMLInputElement>(null)
+  const [docsUploadedFiles, setDocsUploadedFiles] = useState<string[]>([])
+  const [doneFilter,  setDoneFilter]  = useState('All')
+  const [feedbackRating, setFeedbackRating] = useState(-1)
+  const [supportGuide,   setSupportGuide]   = useState<string|null>(null)
+  const [connWizard,     setConnWizard]     = useState<'whatsapp'|'linkedin'|null>(null)
+  const [connWaStep,     setConnWaStep]     = useState(1)
+  const [connWaFields,   setConnWaFields]   = useState({ phone_number_id:'', access_token:'', business_account_id:'' })
+  const [connWaCopied,   setConnWaCopied]   = useState(false)
 
   type Att = { name: string; type: string; data: string; preview?: string }
   const [attachments, setAttachments] = useState<Att[]>([])
@@ -268,7 +278,7 @@ export default function StudioPage() {
 
   async function send(text?: string) {
     const msg=(text??input).trim(); if(!msg||streaming) return
-    setInput(''); setShowSkills(false); setShowSnippets(false); setView('chat')
+    setInput(''); setShowSkills(false); setView('chat')
     const atts=[...attachments]; setAttachments([])
     const uid=newId(), aid=newId()
     setMessages(p=>[...p,{id:uid,role:'user',content:msg},{id:aid,role:'assistant',content:'',tools:[],streaming:true}])
@@ -303,7 +313,7 @@ export default function StudioPage() {
   function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}
     if(e.key==='/'&&input==='') setShowSkills(true)
-    if(e.key==='Escape'){setShowSkills(false);setShowSnippets(false)}
+    if(e.key==='Escape'){setShowSkills(false)}
   }
   function fmtDate(iso: string) {
     const d=new Date(iso),now=new Date(),diff=Math.floor((now.getTime()-d.getTime())/86400000)
@@ -368,7 +378,7 @@ export default function StudioPage() {
       { label:'Meetings Today',value:'3',     delta:'Next: 3pm', icon:'📅', color:T.gold   },
     ]
     return (
-      <div style={{maxWidth:900,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
+      <div className="dash-pad" style={{maxWidth:900,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
         <div style={{marginBottom:28}}>
           <p style={{margin:0,fontSize:12,color:T.textdim,fontFamily:MONO,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.1em'}}>{dateStr}</p>
           <h1 style={{margin:'6px 0 4px',fontSize:26,fontWeight:700,color:T.text,letterSpacing:'-0.025em'}}>{greeting}, Siamak</h1>
@@ -376,7 +386,7 @@ export default function StudioPage() {
         </div>
 
         {/* Stats */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:28}}>
+        <div className="stats-grid" style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:28}}>
           {stats.map(s=>(
             <div key={s.label} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'18px 20px',boxShadow:T.shadowsm,cursor:'pointer',transition:'all 0.15s'}}
               onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=T.shadow}}
@@ -391,7 +401,7 @@ export default function StudioPage() {
           ))}
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+        <div className="dash-two-col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
           {/* Quick actions */}
           <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'20px',boxShadow:T.shadowsm}}>
             <p style={{margin:'0 0 14px',fontSize:12,fontWeight:700,color:T.textmd,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Quick Actions</p>
@@ -442,14 +452,14 @@ export default function StudioPage() {
   // ─── Workflows ─────────────────────────────────────────────────────────────
   function ViewWorkflows() {
     return (
-      <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:28}}>
+      <div className="view-pad" style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
+        <div className="wf-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:28}}>
           <div>
             <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Workflows</h1>
             <p style={{margin:0,fontSize:14,color:T.textmd}}>Automated sequences that run in the background, 24/7.</p>
           </div>
           <button onClick={()=>send('I want to create a new workflow. Walk me through the options.')}
-            style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>+ New Workflow</button>
+            style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`,flexShrink:0}}>+ New Workflow</button>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {WORKFLOWS.map(w=>(
@@ -476,16 +486,16 @@ export default function StudioPage() {
   // ─── Agents ────────────────────────────────────────────────────────────────
   function ViewAgents() {
     return (
-      <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:28}}>
+      <div className="view-pad" style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
+        <div className="agents-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:28}}>
           <div>
             <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>AI Agents</h1>
             <p style={{margin:0,fontSize:14,color:T.textmd}}>Specialized AI assistants — activate the ones you need.</p>
           </div>
           <button onClick={()=>send('I want to create a new AI agent. What options do I have?')}
-            style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>+ New Agent</button>
+            style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`,flexShrink:0}}>+ New Agent</button>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
+        <div className="agents-grid" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
           {AGENTS.map(a=>(
             <div key={a.id} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'20px',boxShadow:T.shadowsm,transition:'all 0.15s'}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.transform='translateY(-1px)'}}
@@ -516,10 +526,10 @@ export default function StudioPage() {
     const available = CONNECTIONS.filter(c=>!c.connected)
     const open = (url: string) => window.open(url, '_blank', 'noopener')
 
-    const [wizard, setWizard] = useState<'whatsapp'|'linkedin'|null>(null)
-    const [waStep, setWaStep] = useState(1)
-    const [waFields, setWaFields] = useState({ phone_number_id:'', access_token:'', business_account_id:'' })
-    const [waCopied, setWaCopied] = useState(false)
+    const wizard  = connWizard;  const setWizard  = setConnWizard
+    const waStep  = connWaStep;  const setWaStep  = setConnWaStep
+    const waFields= connWaFields;const setWaFields= setConnWaFields
+    const waCopied= connWaCopied;const setWaCopied= setConnWaCopied
 
     const WEBHOOK_URL = 'https://va.nexterai.agency/api/webhooks/whatsapp'
     const VERIFY_TOKEN = 'nexterai_whatsapp_2026'
@@ -652,7 +662,7 @@ export default function StudioPage() {
     }
 
     return (
-      <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
+      <div className="view-pad" style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
         {wizard === 'whatsapp' && <WhatsAppWizard/>}
         {wizard === 'linkedin' && <LinkedInWizard/>}
 
@@ -685,7 +695,7 @@ export default function StudioPage() {
         </div>
 
         <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Available — click to connect</p>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
+        <div className="avail-grid" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
           {available.map(c=>(
             <div key={c.id} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 18px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',opacity:0.8,transition:'all 0.15s'}}
               onClick={()=>handleConnect(c)}
@@ -710,17 +720,15 @@ export default function StudioPage() {
   // ─── Docs ──────────────────────────────────────────────────────────────────
   function ViewDocs() {
     const folders = ['Contracts', 'Proposals', 'Meeting Notes', 'Templates', 'Reports']
-    const docsFileRef = useRef<HTMLInputElement>(null)
-    const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
     function handleDocFiles(files: FileList | null) {
       if (!files) return
       const names = Array.from(files).map(f => f.name)
-      setUploadedFiles(p => [...p, ...names])
+      setDocsUploadedFiles(p => [...p, ...names])
     }
     return (
-      <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
+      <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 100px'}}>
         <input ref={docsFileRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg" style={{display:'none'}} onChange={e=>handleDocFiles(e.target.files)}/>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:28}}>
+        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:28,flexWrap:'wrap',gap:12}}>
           <div>
             <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Docs</h1>
             <p style={{margin:0,fontSize:14,color:T.textmd}}>Upload documents and reference them in any AI conversation.</p>
@@ -738,17 +746,17 @@ export default function StudioPage() {
             </button>
           </div>
         </div>
-        {uploadedFiles.length > 0 && (
+        {docsUploadedFiles.length > 0 && (
           <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:10,padding:'14px 18px',marginBottom:16,boxShadow:T.shadowsm}}>
             <p style={{margin:'0 0 8px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Uploaded this session</p>
             <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-              {uploadedFiles.map((f,i)=>(
+              {docsUploadedFiles.map((f,i)=>(
                 <span key={i} style={{fontSize:12,background:T.golddim,color:T.gold,border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'3px 10px',fontFamily:MONO}}>📄 {f}</span>
               ))}
             </div>
           </div>
         )}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:24}}>
+        <div className="docs-folders" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:24}}>
           {folders.map(f=>(
             <div key={f} onClick={()=>docsFileRef.current?.click()}
               style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'18px',cursor:'pointer',transition:'all 0.15s',boxShadow:T.shadowsm}}
@@ -781,7 +789,7 @@ export default function StudioPage() {
   // ─── Done For You ──────────────────────────────────────────────────────────
   function ViewDone() {
     const cats = ['All','Email','CRM','Calendar','AI']
-    const [filter, setFilter] = useState('All')
+    const filter = doneFilter; const setFilter = setDoneFilter
     const filtered = filter==='All' ? DONE_LOG : DONE_LOG.filter(d=>d.cat===filter)
     const catColors: Record<string,{bg:string;color:string}> = {
       Email:   {bg:`${T.blue}18`,    color:T.blue   },
@@ -790,7 +798,7 @@ export default function StudioPage() {
       AI:      {bg:`${T.gold}18`,    color:T.gold   },
     }
     return (
-      <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
+      <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 100px'}}>
         <div style={{marginBottom:24}}>
           <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Done For You</h1>
           <p style={{margin:0,fontSize:14,color:T.textmd}}>Everything your AI executed automatically — full audit trail.</p>
@@ -828,7 +836,7 @@ export default function StudioPage() {
   // ─── Feedback ──────────────────────────────────────────────────────────────
   function ViewFeedback() {
     const emojis = ['😞','😐','🙂','😊','🤩']
-    const [rating, setRating] = useState(-1)
+    const rating = feedbackRating; const setRating = setFeedbackRating
     function sendFeedback() {
       if (!feedbackText.trim()) return
       const ratingLabel = rating >= 0 ? `Rating: ${emojis[rating]} (${rating+1}/5)\n\n` : ''
@@ -838,7 +846,7 @@ export default function StudioPage() {
       setFeedbackSent(true)
     }
     return (
-      <div style={{maxWidth:600,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
+      <div className="view-pad" style={{maxWidth:600,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
         <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Feedback</h1>
         <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Help us improve VA App. Sent directly to info@i-review.ai.</p>
         {feedbackSent ? (
@@ -879,7 +887,7 @@ export default function StudioPage() {
 
   // ─── Support ───────────────────────────────────────────────────────────────
   function ViewSupport() {
-    const [activeGuide, setActiveGuide] = useState<string|null>(null)
+    const activeGuide = supportGuide; const setActiveGuide = setSupportGuide
 
     const setupSteps = [
       {
@@ -965,12 +973,12 @@ export default function StudioPage() {
     ]
 
     return (
-      <div style={{maxWidth:780,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
+      <div className="view-pad" style={{maxWidth:780,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
         <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Help Center</h1>
         <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Setup guides, FAQs, and how to reach us.</p>
 
         {/* Contact cards */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:32}}>
+        <div className="support-cards" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:32}}>
           {[
             {icon:'📧',label:'Email Support',    desc:'info@i-review.ai',        action:()=>{ window.location.href='mailto:info@i-review.ai?subject=VA App Support' }},
             {icon:'💬',label:'WhatsApp',         desc:'Quick reply, usually same day', action:()=>window.open('https://wa.me/message/placeholder','_blank','noopener')},
@@ -1042,7 +1050,7 @@ export default function StudioPage() {
         {/* Thread */}
         <div ref={chatScrollRef} style={{flex:1,overflowY:'auto',background:T.bg,overflowAnchor:'none'}}
           onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFiles(e.dataTransfer.files)}}>
-          <div style={{maxWidth:760,width:'100%',margin:'0 auto',padding:'32px 28px 20px',display:'flex',flexDirection:'column'}}>
+          <div className="chat-thread-inner" style={{maxWidth:760,width:'100%',margin:'0 auto',padding:'32px 28px 20px',display:'flex',flexDirection:'column'}}>
 
             {messages.map((msg,idx)=>{
               const isWelcome = msg.content === '__WELCOME__'
@@ -1149,7 +1157,7 @@ export default function StudioPage() {
         )}
 
         {/* Compose */}
-        <div style={{background:T.compose,borderTop:`1px solid ${T.border}`,padding:'14px 28px',paddingBottom:'max(14px,env(safe-area-inset-bottom))',flexShrink:0}}>
+        <div className="compose-area" style={{background:T.compose,borderTop:`1px solid ${T.border}`,padding:'14px 28px',paddingBottom:'max(14px,env(safe-area-inset-bottom))',flexShrink:0}}>
           <div style={{maxWidth:760,margin:'0 auto'}}>
             {attachments.length>0 && (
               <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
@@ -1393,16 +1401,16 @@ export default function StudioPage() {
         </div>
 
         {/* View content */}
-        <div style={{flex:1,overflowY:view==='chat'?'hidden':'auto',display:'flex',flexDirection:'column',background:T.bg}}>
+        <div className={view!=='chat'?'view-scroll':''} style={{flex:1,overflowY:view==='chat'?'hidden':'auto',display:'flex',flexDirection:'column',background:T.bg}}>
           {view === 'chat'        && ViewChat()}
-          {view === 'dashboard'   && <ViewDashboard/>}
-          {view === 'workflows'   && <ViewWorkflows/>}
-          {view === 'agents'      && <ViewAgents/>}
-          {view === 'connections' && <ViewConnections/>}
-          {view === 'docs'        && <ViewDocs/>}
-          {view === 'done'        && <ViewDone/>}
-          {view === 'feedback'    && <ViewFeedback/>}
-          {view === 'support'     && <ViewSupport/>}
+          {view === 'dashboard'   && ViewDashboard()}
+          {view === 'workflows'   && ViewWorkflows()}
+          {view === 'agents'      && ViewAgents()}
+          {view === 'connections' && ViewConnections()}
+          {view === 'docs'        && ViewDocs()}
+          {view === 'done'        && ViewDone()}
+          {view === 'feedback'    && ViewFeedback()}
+          {view === 'support'     && ViewSupport()}
         </div>
       </div>
 
@@ -1482,12 +1490,31 @@ export default function StudioPage() {
         * { box-sizing:border-box; }
         details summary::-webkit-details-marker { display:none; }
         .qa-grid { grid-template-columns: repeat(3,1fr); }
+        .stats-grid { grid-template-columns: repeat(4,1fr); }
+        .dash-two-col { grid-template-columns: 1fr 1fr; }
+        .agents-grid { grid-template-columns: repeat(2,1fr); }
+        .docs-folders { grid-template-columns: repeat(3,1fr); }
+        .avail-grid { grid-template-columns: repeat(2,1fr); }
+        .support-cards { grid-template-columns: 1fr 1fr; }
+        /* mobile: add bottom padding to all non-chat scrolling views */
         @media(max-width:767px){
-          .qa-grid { grid-template-columns:1fr 1fr !important; }
-          .mobile-view-pad { padding-bottom: 72px !important; }
-          .compose-wrap { padding-left:12px !important; padding-right:12px !important; }
-          .chat-thread-inner { padding:16px 14px 12px !important; }
-          .view-scroll-content { padding:20px 16px !important; }
+          .qa-grid          { grid-template-columns:1fr 1fr !important; }
+          .stats-grid       { grid-template-columns:1fr 1fr !important; }
+          .dash-two-col     { grid-template-columns:1fr !important; }
+          .agents-grid      { grid-template-columns:1fr !important; }
+          .docs-folders     { grid-template-columns:1fr 1fr !important; }
+          .avail-grid       { grid-template-columns:1fr !important; }
+          .support-cards    { grid-template-columns:1fr !important; }
+          .view-scroll      { padding-bottom:56px; }
+          .compose-area     { padding-bottom:calc(56px + max(14px, env(safe-area-inset-bottom))) !important; }
+          .compose-inner    { padding-left:12px !important; padding-right:12px !important; }
+          .chat-thread-inner{ padding:16px 12px 16px !important; }
+          .skill-chips      { padding-bottom: 4px !important; }
+          .wf-header        { flex-direction:column; align-items:flex-start !important; gap:10px !important; }
+          .agents-header    { flex-direction:column; align-items:flex-start !important; gap:10px !important; }
+          .docs-header      { flex-direction:column; align-items:flex-start !important; gap:10px !important; }
+          .view-pad         { padding:20px 14px 80px !important; }
+          .dash-pad         { padding:20px 14px 80px !important; }
         }
       `}</style>
     </div>
