@@ -7,6 +7,7 @@ import {
   saveMeetingLocally,
   findGhlContact,
   addGhlNote,
+  autoTagContact,
   sendMeetingEmail,
   sendNoTranscriptAlert,
   buildMeetingEmailHtml,
@@ -119,6 +120,7 @@ export async function GET(req: NextRequest) {
       const contact = await findGhlContact(searchTerm)
       if (contact) {
         await addGhlNote(contact.id, `GOOGLE MEET SUMMARY — ${createdAt}\nMeeting: ${meetingTitle}\n\n${summary}`)
+        await autoTagContact(contact.id, summary, meetingTitle)
       }
 
       // Send styled email

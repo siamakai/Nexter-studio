@@ -6,6 +6,7 @@ import {
   saveMeetingLocally,
   findGhlContact,
   addGhlNote,
+  autoTagContact,
   sendMeetingEmail,
   buildMeetingEmailHtml,
 } from '@/lib/meeting-report'
@@ -119,6 +120,7 @@ async function processRecording(payload: Record<string, unknown>) {
   if (!contact) contact = await findGhlContact(topic.split(/\s+/).slice(0, 3).join(' '))
   if (contact) {
     await addGhlNote(contact.id, `ZOOM MEETING SUMMARY — ${startTime}\nTopic: ${topic}\nDuration: ${duration} min\n\n${summary}`)
+    await autoTagContact(contact.id, summary, topic)
   }
 
   // Send styled email

@@ -328,7 +328,6 @@ export async function execGhlTool(name: string, input: Record<string, unknown>):
     case 'ghl_create_task': {
       const body: Record<string, unknown> = {
         title: input.title,
-        description: input.description || '',
         dueDate: input.due_date || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         completed: false,
       }

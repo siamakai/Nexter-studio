@@ -194,6 +194,77 @@ export async function saveMeetingLocally(_filename: string, _content: string): P
   // no-op — meetings now saved to Supabase and Google Drive
 }
 
+// ─── GHL AUTO-TAGGING ────────────────────────────────────────────────────────
+
+const AVAILABLE_TAGS = [
+  'hot-lead', 'warm-lead', 'cold-lead',
+  'discovery-call', 'proposal-sent', 'negotiation',
+  'client', 'follow-up-needed', 'legal-inquiry',
+  'ai-interested', 'meeting-done',
+]
+
+export async function autoTagContact(contactId: string, summary: string, title: string): Promise<string[]> {
+  if (!process.env.GHL_API_KEY) return []
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+    const res = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `Based on this meeting summary, pick the most relevant tags for the contact. Return ONLY a JSON array of strings, no explanation.
+
+Available tags: ${AVAILABLE_TAGS.join(', ')}
+
+Rules:
+- Always include "meeting-done"
+- "hot-lead" = strong buying signals or ready to proceed
+- "warm-lead" = interested but not committed
+- "proposal-sent" = a proposal, quote, or offer was discussed
+- "discovery-call" = first exploratory call
+- "client" = they are already a client
+- "follow-up-needed" = clear next step required
+- "legal-inquiry" = legal services discussed
+- "ai-interested" = AI/automation topic raised
+- Max 4 tags total
+
+MEETING: ${title}
+SUMMARY:
+${summary.slice(0, 1000)}
+
+Return: ["tag1","tag2",...]`,
+      }],
+    })
+
+    const raw = (res.content[0] as { text: string }).text.trim()
+    const match = raw.match(/\[[\s\S]*\]/)
+    if (!match) return ['meeting-done']
+    const tags: string[] = JSON.parse(match[0])
+    const valid = tags.filter(t => AVAILABLE_TAGS.includes(t))
+
+    // Get existing tags, merge, update
+    const getRes = await fetch(
+      `https://services.leadconnectorhq.com/contacts/${contactId}`,
+      { headers: { Authorization: `Bearer ${process.env.GHL_API_KEY}`, Version: '2021-07-28' } }
+    )
+    const getData = await getRes.json()
+    const existing: string[] = getData.contact?.tags || []
+    const merged = Array.from(new Set([...existing, ...valid]))
+
+    await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${process.env.GHL_API_KEY}`, Version: '2021-07-28', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags: merged }),
+    })
+
+    console.log(`[meeting-report] Tagged contact ${contactId}: ${valid.join(', ')}`)
+    return valid
+  } catch (err) {
+    console.error('[meeting-report] Auto-tag error:', err)
+    return []
+  }
+}
+
 // ─── GHL CRM ─────────────────────────────────────────────────────────────────
 
 export async function findGhlContact(query: string): Promise<{ id: string; name: string } | null> {

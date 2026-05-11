@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VA — Nexter AI Group · Demo Presentation</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#06080F; color:#EDE8E0; overflow:hidden; height:100vh; width:100vw; }
+
+  .deck { width:100vw; height:100vh; position:relative; }
+  .slide { position:absolute; inset:0; display:none; flex-direction:column; justify-content:center; align-items:center; padding:60px; opacity:0; transition:opacity 0.35s ease; }
+  .slide.active { display:flex; opacity:1; }
+
+  /* Colors */
+  :root {
+    --gold: #B8963E;
+    --golddim: rgba(184,150,62,0.12);
+    --goldbrdr: rgba(184,150,62,0.3);
+    --card: #0F1220;
+    --cardbord: rgba(255,255,255,0.07);
+    --textmd: rgba(237,232,224,0.6);
+    --textdim: rgba(237,232,224,0.32);
+    --green: #22C55E;
+    --red: #EF4444;
+  }
+
+  /* Logo mark */
+  .logomark { display:inline-flex; align-items:center; gap:12px; }
+  .logomark svg { flex-shrink:0; }
+  .logomark-text strong { font-size:18px; font-weight:800; color:#EDE8E0; letter-spacing:-0.02em; }
+  .logomark-text span { display:block; font-size:11px; color:var(--textdim); letter-spacing:0.08em; text-transform:uppercase; margin-top:1px; }
+
+  /* Tag */
+  .tag { display:inline-block; background:var(--golddim); border:1px solid var(--goldbrdr); color:var(--gold); font-size:11px; font-weight:700; padding:4px 12px; border-radius:999px; letter-spacing:0.06em; text-transform:uppercase; }
+
+  /* Headings */
+  h1.hero { font-size:clamp(36px,5vw,64px); font-weight:800; letter-spacing:-0.04em; line-height:1.05; color:#EDE8E0; }
+  h1.hero span { color:var(--gold); }
+  h2.title { font-size:clamp(24px,3vw,40px); font-weight:800; letter-spacing:-0.03em; color:#EDE8E0; margin-bottom:8px; }
+  h2.title span { color:var(--gold); }
+  .subtitle { font-size:clamp(14px,1.6vw,18px); color:var(--textmd); line-height:1.65; max-width:680px; text-align:center; }
+
+  /* Cards grid */
+  .grid { display:grid; gap:16px; width:100%; max-width:900px; }
+  .grid-2 { grid-template-columns:repeat(2,1fr); }
+  .grid-3 { grid-template-columns:repeat(3,1fr); }
+  .card { background:var(--card); border:1px solid var(--cardbord); border-radius:14px; padding:22px 24px; }
+  .card-icon { font-size:28px; margin-bottom:10px; }
+  .card h3 { font-size:15px; font-weight:700; color:#EDE8E0; margin-bottom:6px; }
+  .card p { font-size:13px; color:var(--textmd); line-height:1.6; }
+
+  /* Problem slide */
+  .problem-list { list-style:none; display:flex; flex-direction:column; gap:14px; max-width:680px; width:100%; }
+  .problem-list li { display:flex; align-items:flex-start; gap:14px; background:var(--card); border:1px solid var(--cardbord); border-radius:12px; padding:16px 20px; font-size:15px; color:var(--textmd); line-height:1.5; }
+  .problem-list li .icon { font-size:20px; flex-shrink:0; margin-top:1px; }
+
+  /* Screenshot placeholder */
+  .screenshot { width:100%; max-width:820px; background:var(--card); border:1px solid var(--cardbord); border-radius:16px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.6); }
+  .screenshot-bar { background:#0C0E18; padding:10px 16px; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--cardbord); }
+  .screenshot-dot { width:10px; height:10px; border-radius:50%; }
+  .screenshot-body { padding:0; min-height:280px; display:flex; align-items:center; justify-content:center; color:var(--textdim); font-size:13px; position:relative; }
+  .screenshot-body img { width:100%; height:auto; display:block; border-radius:0 0 16px 16px; }
+  .screenshot-placeholder { padding:60px; text-align:center; }
+  .screenshot-placeholder .ph-icon { font-size:40px; margin-bottom:12px; opacity:0.4; }
+  .screenshot-placeholder p { font-size:13px; color:var(--textdim); }
+
+  /* Section layout */
+  .section-layout { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center; width:100%; max-width:960px; }
+  .section-info h2 { font-size:28px; font-weight:800; color:#EDE8E0; letter-spacing:-0.03em; margin-bottom:10px; }
+  .section-info h2 span { color:var(--gold); }
+  .section-info p { font-size:14px; color:var(--textmd); line-height:1.7; margin-bottom:16px; }
+  .feature-list { list-style:none; display:flex; flex-direction:column; gap:8px; }
+  .feature-list li { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--textmd); }
+  .feature-list li::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--gold); flex-shrink:0; }
+
+  /* Workflow step */
+  .flow { display:flex; align-items:center; gap:0; width:100%; max-width:860px; flex-wrap:wrap; justify-content:center; gap:8px; }
+  .flow-step { background:var(--card); border:1px solid var(--cardbord); border-radius:10px; padding:14px 18px; text-align:center; flex:1; min-width:120px; }
+  .flow-step .fs-icon { font-size:22px; margin-bottom:6px; }
+  .flow-step .fs-label { font-size:12px; font-weight:600; color:#EDE8E0; }
+  .flow-step .fs-sub { font-size:10px; color:var(--textdim); margin-top:2px; }
+  .flow-arrow { color:var(--gold); font-size:18px; flex-shrink:0; }
+
+  /* Custom slide */
+  .custom-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; max-width:860px; width:100%; }
+  .custom-card { background:var(--card); border:1px solid var(--cardbord); border-radius:12px; padding:20px; text-align:center; }
+  .custom-card .cc-icon { font-size:30px; margin-bottom:10px; }
+  .custom-card h4 { font-size:14px; font-weight:700; color:#EDE8E0; margin-bottom:6px; }
+  .custom-card p { font-size:12px; color:var(--textmd); line-height:1.55; }
+
+  /* Nav */
+  .nav { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:16px; background:rgba(12,14,24,0.9); border:1px solid var(--cardbord); border-radius:999px; padding:10px 20px; backdrop-filter:blur(12px); z-index:100; }
+  .nav button { background:none; border:none; color:var(--textmd); cursor:pointer; font-size:18px; padding:2px 8px; border-radius:6px; transition:color 0.15s; }
+  .nav button:hover { color:var(--gold); }
+  .nav-counter { font-size:12px; color:var(--textdim); font-family:monospace; min-width:44px; text-align:center; }
+  .nav-dots { display:flex; gap:5px; align-items:center; }
+  .nav-dot { width:5px; height:5px; border-radius:50%; background:var(--cardbord); cursor:pointer; transition:all 0.2s; border:none; }
+  .nav-dot.active { background:var(--gold); width:14px; border-radius:3px; }
+
+  /* Divider line */
+  .divider { width:60px; height:2px; background:var(--gold); border-radius:1px; margin:16px auto; }
+
+  /* Logo on slides */
+  .slide-logo { position:absolute; top:28px; left:40px; }
+
+  /* Slide number */
+  .slide-num { position:absolute; top:28px; right:40px; font-size:11px; color:var(--textdim); font-family:monospace; }
+
+  /* Pill list */
+  .pill-row { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:700px; }
+  .pill { background:var(--golddim); border:1px solid var(--goldbrdr); color:var(--gold); border-radius:999px; padding:6px 16px; font-size:13px; font-weight:600; }
+
+  /* Title slide accent line */
+  .accent-line { width:3px; height:48px; background:var(--gold); border-radius:2px; }
+
+  /* CTA slide */
+  .cta-box { background:var(--card); border:1px solid var(--goldbrdr); border-radius:20px; padding:48px 56px; text-align:center; max-width:620px; width:100%; }
+  .cta-url { font-family:monospace; font-size:18px; color:var(--gold); font-weight:700; letter-spacing:0.02em; margin-top:12px; display:block; }
+
+  @media (max-width:700px) {
+    .slide { padding:28px 20px; }
+    .grid-3 { grid-template-columns:1fr; }
+    .section-layout { grid-template-columns:1fr; gap:24px; }
+    .custom-grid { grid-template-columns:1fr; }
+    h1.hero { font-size:28px; }
+    .flow { gap:6px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- ── SLIDE 1: Title ─────────────────────────────────────── -->
+  <div class="slide active" id="s1">
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:28px">
+      <div class="logomark">
+        <svg width="52" height="52" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+        <div class="logomark-text"><strong>VA</strong><span>Nexter AI Group</span></div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:20px">
+        <div class="accent-line"></div>
+        <h1 class="hero">Your AI <span>Executive</span><br/>Assistant</h1>
+        <div class="accent-line"></div>
+      </div>
+
+      <p class="subtitle">One AI that reads your emails, manages your leads, books meetings,<br/>sends follow-ups — and does it all automatically, 24/7.</p>
+
+      <span class="tag">Live Demo</span>
+    </div>
+    <div class="slide-num">1 / 10</div>
+  </div>
+
+  <!-- ── SLIDE 2: The Problem ───────────────────────────────── -->
+  <div class="slide" id="s2">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:32px">
+      <span class="tag">The Problem</span>
+      <h2 class="title" style="margin-top:14px">You're <span>losing hours</span> every day<br/>to tasks that shouldn't need you</h2>
+    </div>
+    <ul class="problem-list">
+      <li><span class="icon">📧</span>Checking emails across Gmail and Outlook — switching tabs, missing threads, drafting the same replies</li>
+      <li><span class="icon">📋</span>Updating your CRM manually after every call, email, and meeting — when it should update itself</li>
+      <li><span class="icon">🔥</span>Hot leads going cold because there was no time to follow up — every day you wait, you lose money</li>
+      <li><span class="icon">⏰</span>2–4 hours a day on admin. Not doing the work — just <em>managing</em> the work</li>
+    </ul>
+    <div class="slide-num">2 / 10</div>
+  </div>
+
+  <!-- ── SLIDE 3: What Is VA ────────────────────────────────── -->
+  <div class="slide" id="s3">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:32px">
+      <span class="tag">The Solution</span>
+      <h2 class="title" style="margin-top:14px">VA doesn't just <span>answer questions</span><br/>— it <span>takes action</span></h2>
+    </div>
+    <div class="grid grid-3" style="max-width:860px">
+      <div class="card" style="border-color:var(--goldbrdr)">
+        <div class="card-icon">🧠</div>
+        <h3>AI-Powered</h3>
+        <p>Built on Claude — the most advanced AI assistant. Understands context, remembers your business, thinks like an executive.</p>
+      </div>
+      <div class="card" style="border-color:var(--goldbrdr)">
+        <div class="card-icon">⚡</div>
+        <h3>Takes Action</h3>
+        <p>Not just answers — it sends emails, creates meetings, updates your CRM, sends WhatsApp messages. Real work, done.</p>
+      </div>
+      <div class="card" style="border-color:var(--goldbrdr)">
+        <div class="card-icon">🔌</div>
+        <h3>Fully Connected</h3>
+        <p>Gmail, Outlook, Calendar, CRM, Calendly, Zoom, WhatsApp, LinkedIn — all in one place, working together.</p>
+      </div>
+    </div>
+    <div class="slide-num">3 / 10</div>
+  </div>
+
+  <!-- ── SLIDE 4: Chat Interface ────────────────────────────── -->
+  <div class="slide" id="s4">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div class="section-layout">
+      <div class="section-info">
+        <span class="tag">Chat</span>
+        <h2 style="margin-top:14px">Talk to it like a <span>real assistant</span></h2>
+        <p>Just type what you need in plain language. No commands, no training, no technical knowledge required.</p>
+        <ul class="feature-list">
+          <li>"Show me my hot leads"</li>
+          <li>"What's on my calendar today?"</li>
+          <li>"Send a follow-up email to James"</li>
+          <li>"Sync my Calendly contacts to CRM"</li>
+          <li>"Give me a morning briefing"</li>
+          <li>"Draft a proposal for Ahmed"</li>
+        </ul>
+      </div>
+      <div class="screenshot">
+        <div class="screenshot-bar">
+          <div class="screenshot-dot" style="background:#FF5F57"></div>
+          <div class="screenshot-dot" style="background:#FFBD2E"></div>
+          <div class="screenshot-dot" style="background:#28CA41"></div>
+          <span style="font-size:11px;color:rgba(237,232,224,0.3);margin-left:8px;font-family:monospace">va.nexterai.agency</span>
+        </div>
+        <div class="screenshot-body" id="ph-chat">
+          <img src="screenshot-chat.png" alt="Chat interface" onerror="this.parentElement.innerHTML='<div class=screenshot-placeholder><div class=ph-icon>💬</div><p>Screenshot: Chat interface</p></div>'"/>
+        </div>
+      </div>
+    </div>
+    <div class="slide-num">4 / 10</div>
+  </div>
+
+  <!-- ── SLIDE 5: Email & Calendar ─────────────────────────── -->
+  <div class="slide" id="s5">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:28px">
+      <span class="tag">Email & Calendar</span>
+      <h2 class="title" style="margin-top:14px">Your inbox and schedule — <span>always under control</span></h2>
+    </div>
+    <div class="grid grid-2" style="max-width:820px">
+      <div class="card">
+        <div class="card-icon">📧</div>
+        <h3>Email — Gmail + Outlook</h3>
+        <p>VA reads both inboxes, flags what needs attention, drafts replies in your voice, and sends them — one message away.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📅</div>
+        <h3>Calendar — Google + Outlook</h3>
+        <p>See your full day, create events, get prep briefs before every meeting — automatically, 1 hour before the call.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📹</div>
+        <h3>Zoom Integration</h3>
+        <p>Creates Zoom meetings instantly, sends links to participants, and stores recordings for later reference.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📞</div>
+        <h3>Calendly Sync</h3>
+        <p>Every booking auto-syncs to your CRM. VA handles the confirmation, the Zoom link, and the follow-up — hands-free.</p>
+      </div>
+    </div>
+    <div class="slide-num">5 / 10</div>
+  </div>
+
+  <!-- ── SLIDE 6: CRM & Leads ───────────────────────────────── -->
+  <div class="slide" id="s6">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div class="section-layout" style="direction:rtl">
+      <div class="section-info" style="direction:ltr">
+        <span class="tag">CRM & Pipeline</span>
+        <h2 style="margin-top:14px">Never let a <span>hot lead</span> go cold</h2>
+        <p>VA connects to Go High Level CRM and manages your entire pipeline — contacts, tags, tasks, notes, and follow-ups.</p>
+        <ul class="feature-list">
+          <li>Instantly surface hot, warm, and cold leads</li>
+          <li>Auto-tag contacts after every interaction</li>
+          <li>Create tasks and notes from a conversation</li>
+          <li>Track pipeline value and deal stages</li>
+          <li>7-day stale lead alert — no one slips away</li>
+        </ul>
+      </div>
+      <div class="screenshot" style="direction:ltr">
+        <div class="screenshot-bar">
+          <div class="screenshot-dot" style="background:#FF5F57"></div>
+          <div class="screenshot-dot" style="background:#FFBD2E"></div>
+          <div class="screenshot-dot" style="background:#28CA41"></div>
+        </div>
+        <div class="screenshot-body">
+          <img src="screenshot-crm.png" alt="CRM view" onerror="this.parentElement.innerHTML='<div class=screenshot-placeholder><div class=ph-icon>🏢</div><p>Screenshot: CRM / hot leads result</p></div>'"/>
+        </div>
+      </div>
+    </div>
+    <div class="slide-num">6 / 10</div>
+  </div>
+
+  <!-- ── SLIDE 7: Automations ───────────────────────────────── -->
+  <div class="slide" id="s7">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:28px">
+      <span class="tag">Automations</span>
+      <h2 class="title" style="margin-top:14px">Things that happen <span>while you sleep</span></h2>
+    </div>
+
+    <div style="width:100%;max-width:860px;margin-bottom:24px">
+      <p style="font-size:12px;color:var(--textdim);text-align:center;margin-bottom:14px;font-family:monospace;letter-spacing:0.06em;text-transform:uppercase">New Booking Flow — fires automatically on every Calendly booking</p>
+      <div class="flow">
+        <div class="flow-step"><div class="fs-icon">📞</div><div class="fs-label">Calendly</div><div class="fs-sub">Booking received</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="fs-icon">📹</div><div class="fs-label">Zoom</div><div class="fs-sub">Meeting created</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="fs-icon">📅</div><div class="fs-label">Calendar</div><div class="fs-sub">Event added</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="fs-icon">📧</div><div class="fs-label">Email</div><div class="fs-sub">Confirmation sent</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="fs-icon">🏢</div><div class="fs-label">CRM</div><div class="fs-sub">Contact logged</div></div>
+      </div>
+    </div>
+
+    <div class="grid grid-3" style="max-width:860px">
+      <div class="card">
+        <div class="card-icon">🔥</div>
+        <h3>Hot Lead Alert</h3>
+        <p>New contact hits a quality score → auto-tagged, task created, you get notified instantly.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">😴</div>
+        <h3>Stale Lead Nudge</h3>
+        <p>No contact in 7 days → VA drafts a follow-up and alerts you before the lead goes cold.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📋</div>
+        <h3>Meeting Prep Brief</h3>
+        <p>1 hour before every call → VA pulls CRM data and gives you a full briefing automatically.</p>
+      </div>
+    </div>
+    <div class="slide-num">7 / 10</div>
+  </div>
+
+  <!-- ── SLIDE 8: WhatsApp & LinkedIn ──────────────────────── -->
+  <div class="slide" id="s8">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:28px">
+      <span class="tag">WhatsApp & LinkedIn</span>
+      <h2 class="title" style="margin-top:14px">Every channel, <span>one place</span></h2>
+    </div>
+    <div class="grid grid-2" style="max-width:820px">
+      <div class="card" style="border-color:rgba(37,211,102,0.3)">
+        <div class="card-icon">📱</div>
+        <h3>WhatsApp Business</h3>
+        <p>Read incoming client messages and send replies directly from the VA chat. No phone needed. Every message logged in your CRM automatically.</p>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <span style="font-size:11px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.25);color:#22C55E;padding:3px 10px;border-radius:999px;font-weight:600">Read messages</span>
+          <span style="font-size:11px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.25);color:#22C55E;padding:3px 10px;border-radius:999px;font-weight:600">Send replies</span>
+          <span style="font-size:11px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.25);color:#22C55E;padding:3px 10px;border-radius:999px;font-weight:600">Auto-log contacts</span>
+        </div>
+      </div>
+      <div class="card" style="border-color:rgba(10,102,194,0.4)">
+        <div class="card-icon">🔗</div>
+        <h3>LinkedIn</h3>
+        <p>Post content, search for prospects, and manage professional outreach — all from the same interface without opening LinkedIn.</p>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <span style="font-size:11px;background:rgba(10,102,194,0.15);border:1px solid rgba(10,102,194,0.3);color:#3B82F6;padding:3px 10px;border-radius:999px;font-weight:600">Post content</span>
+          <span style="font-size:11px;background:rgba(10,102,194,0.15);border:1px solid rgba(10,102,194,0.3);color:#3B82F6;padding:3px 10px;border-radius:999px;font-weight:600">Search people</span>
+          <span style="font-size:11px;background:rgba(10,102,194,0.15);border:1px solid rgba(10,102,194,0.3);color:#3B82F6;padding:3px 10px;border-radius:999px;font-weight:600">Track outreach</span>
+        </div>
+      </div>
+    </div>
+    <div class="slide-num">8 / 10</div>
+  </div>
+
+  <!-- ── SLIDE 9: Customization ─────────────────────────────── -->
+  <div class="slide" id="s9">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:28px">
+      <span class="tag">Built For You</span>
+      <h2 class="title" style="margin-top:14px">We customize it <span>for your business</span></h2>
+      <p class="subtitle" style="font-size:14px;margin-top:8px">This is not a generic tool. Every deployment is tailored to the client — your brand, your tools, your workflows.</p>
+    </div>
+    <div class="custom-grid">
+      <div class="custom-card">
+        <div class="cc-icon">🎨</div>
+        <h4>Your Brand</h4>
+        <p>Your logo, your colors, your domain. Clients see your brand — not ours.</p>
+      </div>
+      <div class="custom-card">
+        <div class="cc-icon">🔌</div>
+        <h4>Your Tools</h4>
+        <p>Connect the exact platforms your business runs on. We add integrations on request.</p>
+      </div>
+      <div class="custom-card">
+        <div class="cc-icon">⚙️</div>
+        <h4>Your Workflows</h4>
+        <p>Custom automations built around your specific processes and team structure.</p>
+      </div>
+      <div class="custom-card">
+        <div class="cc-icon">🤖</div>
+        <h4>Your AI Persona</h4>
+        <p>VA learns your voice, your business context, and your clients' names and history.</p>
+      </div>
+      <div class="custom-card">
+        <div class="cc-icon">🌐</div>
+        <h4>Your Domain</h4>
+        <p>Deployed on your own subdomain — va.yourbusiness.com. Live in 24–48 hours.</p>
+      </div>
+      <div class="custom-card">
+        <div class="cc-icon">📊</div>
+        <h4>Your Reports</h4>
+        <p>Weekly summaries, pipeline reports, and activity logs tailored to your KPIs.</p>
+      </div>
+    </div>
+    <div class="slide-num">9 / 10</div>
+  </div>
+
+  <!-- ── SLIDE 10: CTA ──────────────────────────────────────── -->
+  <div class="slide" id="s10">
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:32px">
+      <div class="logomark">
+        <svg width="44" height="44" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+        <div class="logomark-text"><strong>VA</strong><span>Nexter AI Group</span></div>
+      </div>
+
+      <div class="cta-box">
+        <h2 class="title">Ready to get your<br/><span>2 hours back</span> every day?</h2>
+        <div class="divider"></div>
+        <p style="font-size:14px;color:var(--textmd);line-height:1.7">VA is live and running. We can have your customized version ready in 24–48 hours — connected to your tools, configured for your business.</p>
+        <span class="cta-url">va.nexterai.agency</span>
+      </div>
+
+      <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center">
+        <div style="text-align:center;background:var(--card);border:1px solid var(--cardbord);border-radius:12px;padding:16px 24px">
+          <div style="font-size:24px;font-weight:800;color:var(--gold)">24h</div>
+          <div style="font-size:12px;color:var(--textdim);margin-top:2px">Setup time</div>
+        </div>
+        <div style="text-align:center;background:var(--card);border:1px solid var(--cardbord);border-radius:12px;padding:16px 24px">
+          <div style="font-size:24px;font-weight:800;color:var(--gold)">12+</div>
+          <div style="font-size:12px;color:var(--textdim);margin-top:2px">Integrations</div>
+        </div>
+        <div style="text-align:center;background:var(--card);border:1px solid var(--cardbord);border-radius:12px;padding:16px 24px">
+          <div style="font-size:24px;font-weight:800;color:var(--gold)">24/7</div>
+          <div style="font-size:12px;color:var(--textdim);margin-top:2px">Always on</div>
+        </div>
+        <div style="text-align:center;background:var(--card);border:1px solid var(--cardbord);border-radius:12px;padding:16px 24px">
+          <div style="font-size:24px;font-weight:800;color:var(--gold)">100%</div>
+          <div style="font-size:12px;color:var(--textdim);margin-top:2px">Your brand</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-num">10 / 10</div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- Navigation -->
+<div class="nav">
+  <button onclick="go(-1)" title="Previous">←</button>
+  <div class="nav-dots" id="dots"></div>
+  <div class="nav-counter" id="counter">1 / 10</div>
+  <button onclick="go(1)" title="Next">→</button>
+</div>
+
+<script>
+  const total = 10
+  let cur = 1
+
+  const dots = document.getElementById('dots')
+  for (let i = 1; i <= total; i++) {
+    const d = document.createElement('button')
+    d.className = 'nav-dot' + (i===1?' active':'')
+    d.onclick = () => goTo(i)
+    dots.appendChild(d)
+  }
+
+  function goTo(n) {
+    document.getElementById('s'+cur).classList.remove('active')
+    dots.children[cur-1].classList.remove('active')
+    cur = Math.max(1, Math.min(total, n))
+    document.getElementById('s'+cur).classList.add('active')
+    dots.children[cur-1].classList.add('active')
+    document.getElementById('counter').textContent = cur + ' / ' + total
+  }
+
+  function go(d) { goTo(cur + d) }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); go(1) }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    { e.preventDefault(); go(-1) }
+    if (e.key === 'Home') goTo(1)
+    if (e.key === 'End')  goTo(total)
+  })
+
+  // Touch swipe
+  let tx = 0
+  document.addEventListener('touchstart', e => tx = e.touches[0].clientX)
+  document.addEventListener('touchend',   e => {
+    const dx = tx - e.changedTouches[0].clientX
+    if (Math.abs(dx) > 50) go(dx > 0 ? 1 : -1)
+  })
+</script>
+</body>
+</html>

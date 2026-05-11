@@ -189,11 +189,13 @@ export default function StudioPage() {
   const [feedbackSent,  setFeedbackSent]  = useState(false)
   const [dateStr,       setDateStr]       = useState('')
   const [nowStr,        setNowStr]        = useState('')
+  const [showMoreDrawer,setShowMoreDrawer]= useState(false)
 
   type Att = { name: string; type: string; data: string; preview?: string }
   const [attachments, setAttachments] = useState<Att[]>([])
 
   const bottomRef   = useRef<HTMLDivElement>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
   const inputRef    = useRef<HTMLTextAreaElement>(null)
   const fileInputRef= useRef<HTMLInputElement>(null)
 
@@ -221,7 +223,21 @@ export default function StudioPage() {
   }, [])
 
   useEffect(() => { if (activePanel==='history') fetchSessions() }, [activePanel])
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:'smooth' }) }, [messages])
+  const msgCount = messages.length
+  // Scroll to bottom when a new message is added (not on every streaming token)
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+    }
+  }, [msgCount])
+  // Follow bottom while streaming — instant, no animation so it doesn't fight itself
+  useEffect(() => {
+    if (!streaming) return
+    const el = chatScrollRef.current
+    if (!el) return
+    const id = setInterval(() => { el.scrollTop = el.scrollHeight }, 60)
+    return () => clearInterval(id)
+  }, [streaming])
 
   async function fetchSessions() {
     try { const r=await fetch('/api/conversations'); if(r.ok) setSessions(await r.json()) } catch { /**/ }
@@ -499,8 +515,147 @@ export default function StudioPage() {
     const connected = CONNECTIONS.filter(c=>c.connected)
     const available = CONNECTIONS.filter(c=>!c.connected)
     const open = (url: string) => window.open(url, '_blank', 'noopener')
+
+    const [wizard, setWizard] = useState<'whatsapp'|'linkedin'|null>(null)
+    const [waStep, setWaStep] = useState(1)
+    const [waFields, setWaFields] = useState({ phone_number_id:'', access_token:'', business_account_id:'' })
+    const [waCopied, setWaCopied] = useState(false)
+
+    const WEBHOOK_URL = 'https://va.nexterai.agency/api/webhooks/whatsapp'
+    const VERIFY_TOKEN = 'nexterai_whatsapp_2026'
+
+    function copyText(text: string, setCopied: (v:boolean)=>void) {
+      navigator.clipboard.writeText(text).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000) })
+    }
+
+    function WizardOverlay({ children }: { children: React.ReactNode }) {
+      return (
+        <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)'}}
+          onClick={()=>{setWizard(null);setWaStep(1);setWaFields({phone_number_id:'',access_token:'',business_account_id:''})}}>
+          <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:16,padding:'32px 36px',maxWidth:540,width:'90%',boxShadow:T.shadow,position:'relative'}}
+            onClick={e=>e.stopPropagation()}>
+            <button onClick={()=>{setWizard(null);setWaStep(1)}}
+              style={{position:'absolute',top:16,right:16,background:'none',border:'none',color:T.textdim,fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+            {children}
+          </div>
+        </div>
+      )
+    }
+
+    function WhatsAppWizard() {
+      const steps = [
+        { num:1, title:'Create a Meta App', body: <>Go to <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener" style={{color:T.gold}}>developers.facebook.com/apps</a> → Create App → Choose <strong style={{color:T.text}}>Business</strong> type → Add <strong style={{color:T.text}}>WhatsApp</strong> product.</> },
+        { num:2, title:'Get your credentials', body: <>In WhatsApp → API Setup, copy:<br/><br/><strong style={{color:T.text}}>Phone Number ID</strong> — shown under "From" number<br/><strong style={{color:T.text}}>Access Token</strong> — temporary token (or generate permanent)<br/><strong style={{color:T.text}}>WhatsApp Business Account ID</strong> — shown at top of the page</> },
+        { num:3, title:'Register webhook', body: <>In WhatsApp → Configuration → Webhook, paste these values:<br/><br/>
+          <div style={{background:T.inputbg,border:`1px solid ${T.border}`,borderRadius:8,padding:'12px 14px',marginTop:8}}>
+            <p style={{margin:'0 0 6px',fontSize:11,color:T.textdim,fontFamily:MONO}}>CALLBACK URL</p>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <code style={{flex:1,fontSize:12,color:T.text,fontFamily:MONO,wordBreak:'break-all'}}>{WEBHOOK_URL}</code>
+              <button onClick={()=>copyText(WEBHOOK_URL,setWaCopied)}
+                style={{fontSize:11,padding:'4px 10px',background:T.golddim,border:`1px solid ${T.goldbrdr}`,borderRadius:6,color:T.gold,cursor:'pointer',fontFamily:MONO,flexShrink:0}}>
+                {waCopied?'Copied!':'Copy'}
+              </button>
+            </div>
+            <hr style={{border:'none',borderTop:`1px solid ${T.border}`,margin:'10px 0'}}/>
+            <p style={{margin:'0 0 4px',fontSize:11,color:T.textdim,fontFamily:MONO}}>VERIFY TOKEN</p>
+            <code style={{fontSize:12,color:T.text,fontFamily:MONO}}>{VERIFY_TOKEN}</code>
+          </div>
+          <p style={{margin:'10px 0 0',fontSize:12,color:T.textmd}}>Subscribe to the <strong style={{color:T.text}}>messages</strong> webhook field.</p>
+        </> },
+        { num:4, title:'Enter your credentials', body: (
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            {(['phone_number_id','access_token','business_account_id'] as const).map(key=>(
+              <div key={key}>
+                <label style={{display:'block',fontSize:11,color:T.textdim,fontFamily:MONO,marginBottom:4,textTransform:'uppercase',letterSpacing:'0.08em'}}>{key.replace(/_/g,' ')}</label>
+                <input value={waFields[key]} onChange={e=>setWaFields(p=>({...p,[key]:e.target.value}))}
+                  placeholder={key==='phone_number_id'?'123456789012345':key==='access_token'?'EAAxxxxxx...':'987654321098765'}
+                  style={{width:'100%',padding:'9px 12px',background:T.inputbg,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,fontSize:13,fontFamily:MONO,outline:'none',boxSizing:'border-box'}}/>
+              </div>
+            ))}
+            <p style={{margin:'4px 0 0',fontSize:12,color:T.textmd}}>Add these to Vercel → Environment Variables, then redeploy.</p>
+          </div>
+        ) },
+      ]
+      const step = steps[waStep-1]
+      return (
+        <WizardOverlay>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+            <span style={{fontSize:28}}>📱</span>
+            <div>
+              <h2 style={{margin:0,fontSize:18,fontWeight:700,color:T.text}}>Connect WhatsApp Business</h2>
+              <p style={{margin:'2px 0 0',fontSize:12,color:T.textmd}}>Step {waStep} of {steps.length}</p>
+            </div>
+          </div>
+
+          <div style={{display:'flex',gap:6,marginBottom:24}}>
+            {steps.map(s=>(
+              <div key={s.num} style={{flex:1,height:3,borderRadius:2,background:waStep>=s.num?T.gold:T.border,transition:'background 0.2s'}}/>
+            ))}
+          </div>
+
+          <h3 style={{margin:'0 0 12px',fontSize:15,fontWeight:600,color:T.text}}>{step.num}. {step.title}</h3>
+          <div style={{fontSize:13,color:T.textmd,lineHeight:1.7}}>{step.body}</div>
+
+          <div style={{display:'flex',gap:10,marginTop:24,justifyContent:'flex-end'}}>
+            {waStep>1 && <button onClick={()=>setWaStep(s=>s-1)}
+              style={{padding:'8px 18px',background:'none',border:`1px solid ${T.border}`,borderRadius:8,color:T.textmd,cursor:'pointer',fontSize:13}}>Back</button>}
+            {waStep<steps.length
+              ? <button onClick={()=>setWaStep(s=>s+1)}
+                  style={{padding:'8px 20px',background:T.gold,border:'none',borderRadius:8,color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}>Next →</button>
+              : <button onClick={()=>{setWizard(null);setWaStep(1)}}
+                  style={{padding:'8px 20px',background:T.gold,border:'none',borderRadius:8,color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}>Done ✓</button>
+            }
+          </div>
+        </WizardOverlay>
+      )
+    }
+
+    function LinkedInWizard() {
+      return (
+        <WizardOverlay>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+            <span style={{fontSize:28}}>🔗</span>
+            <div>
+              <h2 style={{margin:0,fontSize:18,fontWeight:700,color:T.text}}>Connect LinkedIn</h2>
+              <p style={{margin:'2px 0 0',fontSize:12,color:T.textmd}}>One-click OAuth connection</p>
+            </div>
+          </div>
+
+          <div style={{background:T.inputbg,border:`1px solid ${T.border}`,borderRadius:10,padding:'16px 18px',marginBottom:20}}>
+            <p style={{margin:'0 0 8px',fontSize:13,fontWeight:600,color:T.text}}>Before connecting:</p>
+            <ol style={{margin:0,paddingLeft:18,fontSize:13,color:T.textmd,lineHeight:1.8}}>
+              <li>Go to <a href="https://www.linkedin.com/developers/apps/new" target="_blank" rel="noopener" style={{color:T.gold}}>LinkedIn Developer Apps</a> → Create app</li>
+              <li>Add products: <strong style={{color:T.text}}>Share on LinkedIn</strong> + <strong style={{color:T.text}}>Sign In with LinkedIn</strong></li>
+              <li>Set redirect URL to: <code style={{fontSize:11,fontFamily:MONO,color:T.gold}}>https://va.nexterai.agency/api/auth/linkedin/callback</code></li>
+              <li>Copy Client ID and Client Secret → add to Vercel env vars:<br/>
+                <code style={{fontSize:11,fontFamily:MONO,color:T.text}}>LINKEDIN_CLIENT_ID</code> and <code style={{fontSize:11,fontFamily:MONO,color:T.text}}>LINKEDIN_CLIENT_SECRET</code>
+              </li>
+            </ol>
+          </div>
+
+          <p style={{margin:'0 0 16px',fontSize:13,color:T.textmd}}>Once credentials are in Vercel, click below to authorize:</p>
+
+          <button onClick={()=>open('/api/auth/linkedin')}
+            style={{width:'100%',padding:'12px',background:'#0A66C2',border:'none',borderRadius:10,color:'#fff',fontSize:14,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+            <span style={{fontSize:18}}>🔗</span> Connect with LinkedIn
+          </button>
+
+          <p style={{margin:'12px 0 0',fontSize:11,color:T.textdim,textAlign:'center'}}>You'll be redirected to LinkedIn to approve access, then brought back with your access token.</p>
+        </WizardOverlay>
+      )
+    }
+
+    function handleConnect(c: typeof CONNECTIONS[0]) {
+      if (c.id === 'whatsapp') { setWizard('whatsapp'); setWaStep(1) }
+      else if (c.id === 'linkedin') { setWizard('linkedin') }
+      else open(c.addUrl)
+    }
+
     return (
       <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px'}}>
+        {wizard === 'whatsapp' && <WhatsAppWizard/>}
+        {wizard === 'linkedin' && <LinkedInWizard/>}
+
         <div style={{marginBottom:28}}>
           <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Connections</h1>
           <p style={{margin:0,fontSize:14,color:T.textmd}}>Manage your integrations. Connect in under 30 seconds.</p>
@@ -533,7 +688,7 @@ export default function StudioPage() {
         <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
           {available.map(c=>(
             <div key={c.id} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 18px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',opacity:0.8,transition:'all 0.15s'}}
-              onClick={()=>open(c.addUrl)}
+              onClick={()=>handleConnect(c)}
               onMouseEnter={e=>{e.currentTarget.style.opacity='1';e.currentTarget.style.borderColor=T.goldbrdr}}
               onMouseLeave={e=>{e.currentTarget.style.opacity='0.8';e.currentTarget.style.borderColor=T.cardBord}}>
               <span style={{fontSize:20,flexShrink:0}}>{c.icon}</span>
@@ -541,7 +696,7 @@ export default function StudioPage() {
                 <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{c.name}</p>
                 <p style={{margin:'1px 0 0',fontSize:11,color:T.textmd,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.desc}</p>
               </div>
-              <button onClick={e=>{e.stopPropagation();open(c.addUrl)}}
+              <button onClick={e=>{e.stopPropagation();handleConnect(c)}}
                 style={{fontSize:11,color:T.gold,background:T.golddim,border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'5px 12px',cursor:'pointer',fontFamily:MONO,fontWeight:600,flexShrink:0}}>
                 + Connect
               </button>
@@ -885,7 +1040,7 @@ export default function StudioPage() {
     return (
       <>
         {/* Thread */}
-        <div style={{flex:1,overflowY:'auto',background:T.bg}}
+        <div ref={chatScrollRef} style={{flex:1,overflowY:'auto',background:T.bg,overflowAnchor:'none'}}
           onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFiles(e.dataTransfer.files)}}>
           <div style={{maxWidth:760,width:'100%',margin:'0 auto',padding:'32px 28px 20px',display:'flex',flexDirection:'column'}}>
 
@@ -1083,7 +1238,7 @@ export default function StudioPage() {
     <div style={{display:'flex',height:'100dvh',overflow:'hidden',background:T.bg,color:T.text,fontFamily:FONT,fontSize:15}}>
 
       {/* ────────────── LEFT SIDEBAR ────────────── */}
-      <aside style={{width:sideW,background:T.sidebar,borderRight:`1px solid ${T.border}`,display:'flex',flexDirection:'column',flexShrink:0,transition:'width 0.2s',overflow:'hidden'}} className="hidden md:flex">
+      <aside style={{width:sideW,background:T.sidebar,borderRight:`1px solid ${T.border}`,flexDirection:'column',flexShrink:0,transition:'width 0.2s',overflow:'hidden'}} className="hidden md:flex">
 
         {/* Logo + app name */}
         <div style={{padding:sideCollapsed?'16px 0 10px':'20px 14px 14px',borderBottom:`1px solid ${T.divider}`,display:'flex',alignItems:'center',gap:10,justifyContent:sideCollapsed?'center':'flex-start'}}>
@@ -1210,8 +1365,11 @@ export default function StudioPage() {
         {/* Top bar */}
         <div style={{height:50,borderBottom:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 20px',flexShrink:0,background:T.topbar}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            {/* Mobile: show logo */}
-            <div className="md:hidden"><LogoMark size={28}/></div>
+            {/* Mobile: show logo + product name */}
+            <div className="md:hidden" style={{display:'flex',alignItems:'center',gap:8}}>
+              <LogoMark size={28}/>
+              <span style={{fontSize:14,fontWeight:700,color:T.gold,letterSpacing:'0.02em'}}>VA</span>
+            </div>
             <span style={{fontSize:14,fontWeight:600,color:T.text,letterSpacing:'-0.01em'}} className="hidden md:inline">
               {view === 'chat' ? 'AI Assistant' : view === 'dashboard' ? 'Dashboard' : view === 'workflows' ? 'Workflows' : view === 'agents' ? 'Agents' : view === 'connections' ? 'Connections' : view === 'docs' ? 'Docs' : view === 'done' ? 'Done For You' : view === 'feedback' ? 'Feedback' : 'Support'}
             </span>
@@ -1223,7 +1381,7 @@ export default function StudioPage() {
             )}
             <div style={{display:'flex',alignItems:'center',gap:6}}>
               <div style={{width:6,height:6,borderRadius:'50%',background:streaming?T.orange:T.green,boxShadow:`0 0 6px ${streaming?T.orange:T.green}88`,transition:'all 0.4s'}}/>
-              <span style={{fontSize:11,color:T.textdim,fontFamily:MONO}} className="hidden md:inline">{streaming?'Working…':'Connected'}</span>
+              <span style={{fontSize:11,color:T.textdim,fontFamily:MONO}}>{streaming?'Working…':'Connected'}</span>
             </div>
             {nowStr && <span style={{fontSize:11,color:T.textdim,fontFamily:MONO}} className="hidden md:inline">{nowStr}</span>}
             {/* Mobile menu */}
@@ -1236,7 +1394,7 @@ export default function StudioPage() {
 
         {/* View content */}
         <div style={{flex:1,overflowY:view==='chat'?'hidden':'auto',display:'flex',flexDirection:'column',background:T.bg}}>
-          {view === 'chat'        && <ViewChat/>}
+          {view === 'chat'        && ViewChat()}
           {view === 'dashboard'   && <ViewDashboard/>}
           {view === 'workflows'   && <ViewWorkflows/>}
           {view === 'agents'      && <ViewAgents/>}
@@ -1247,6 +1405,70 @@ export default function StudioPage() {
           {view === 'support'     && <ViewSupport/>}
         </div>
       </div>
+
+      {/* ── Mobile Bottom Nav ── */}
+      {showMoreDrawer && (
+        <div style={{position:'fixed',inset:0,zIndex:49,background:'rgba(0,0,0,0.5)',backdropFilter:'blur(4px)'}} className="md:hidden" onClick={()=>setShowMoreDrawer(false)}/>
+      )}
+      <nav className="md:hidden" style={{position:'fixed',bottom:0,left:0,right:0,zIndex:50,background:T.sidebar,borderTop:`1px solid ${T.border}`,paddingBottom:'env(safe-area-inset-bottom)'}}>
+        {/* More drawer — slides up */}
+        {showMoreDrawer && (
+          <div style={{background:T.sidebar,borderTop:`1px solid ${T.border}`,padding:'8px 0 4px'}}>
+            {([
+              {id:'agents' as View,icon:'🤖',label:'Agents'},
+              {id:'docs'   as View,icon:'📁',label:'Docs'},
+              {id:'done'   as View,icon:'✅',label:'Done For You'},
+              {id:'feedback' as View,icon:'💬',label:'Feedback'},
+              {id:'support'  as View,icon:'🆘',label:'Support'},
+            ] as {id:View;icon:string;label:string}[]).map(n=>(
+              <button key={n.id} onClick={()=>{setView(n.id);setShowMoreDrawer(false)}}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'13px 24px',background:view===n.id?T.sideAct:'none',border:'none',cursor:'pointer',color:view===n.id?T.gold:T.textmd,fontSize:15,fontFamily:FONT,textAlign:'left'}}>
+                <span style={{fontSize:20,width:26,textAlign:'center'}}>{n.icon}</span>
+                <span style={{fontWeight:view===n.id?600:400}}>{n.label}</span>
+              </button>
+            ))}
+            <div style={{borderTop:`1px solid ${T.border}`,margin:'6px 0'}}/>
+            <button onClick={()=>{setActivePanel(p=>p==='history'?null:'history');setShowMoreDrawer(false)}}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'13px 24px',background:'none',border:'none',cursor:'pointer',color:T.textmd,fontSize:15,fontFamily:FONT}}>
+              <span style={{fontSize:20,width:26,textAlign:'center'}}>📝</span>
+              <span>Chat History</span>
+            </button>
+            <div style={{display:'flex',alignItems:'center',gap:14,padding:'8px 24px 12px'}}>
+              <span style={{fontSize:20,width:26,textAlign:'center'}}>{dark?'🌙':'☀️'}</span>
+              <span style={{fontSize:15,color:T.textmd,flex:1}}>{dark?'Dark':'Light'} mode</span>
+              <Toggle on={dark} onChange={()=>setDark(d=>!d)}/>
+            </div>
+            <div style={{borderTop:`1px solid ${T.border}`,margin:'4px 0'}}/>
+            <button onClick={()=>{if(typeof window!=='undefined'){localStorage.clear();window.location.href='/'}}}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'13px 24px 16px',background:'none',border:'none',cursor:'pointer',color:T.red,fontSize:15,fontFamily:FONT}}>
+              <span style={{fontSize:20,width:26,textAlign:'center'}}>🚪</span>
+              <span>Sign Out</span>
+            </button>
+          </div>
+        )}
+        {/* 5-tab bar */}
+        <div style={{display:'flex',alignItems:'stretch',height:56}}>
+          {([
+            {id:'chat'        as View,icon:'💬',label:'Chat'},
+            {id:'dashboard'   as View,icon:'#', label:'Dashboard'},
+            {id:'connections' as View,icon:'🔌',label:'Connect'},
+            {id:'workflows'   as View,icon:'⚙', label:'Workflows'},
+          ] as {id:View;icon:string;label:string}[]).map(n=>(
+            <button key={n.id} onClick={()=>{setView(n.id);setShowMoreDrawer(false)}}
+              style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,background:'none',border:'none',cursor:'pointer',color:view===n.id&&!showMoreDrawer?T.gold:T.textdim,padding:'6px 2px',transition:'color 0.15s',WebkitTapHighlightColor:'transparent'}}>
+              <span style={{fontSize:n.icon==='#'||n.icon==='⚙'?17:20,lineHeight:1,fontWeight:n.icon==='#'||n.icon==='⚙'?700:400}}>{n.icon}</span>
+              <span style={{fontSize:10,fontWeight:view===n.id&&!showMoreDrawer?700:400,letterSpacing:'0.01em'}}>{n.label}</span>
+              {view===n.id&&!showMoreDrawer&&<div style={{position:'absolute',bottom:0,width:24,height:2,background:T.gold,borderRadius:1}}/>}
+            </button>
+          ))}
+          <button onClick={()=>setShowMoreDrawer(m=>!m)}
+            style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,background:'none',border:'none',cursor:'pointer',color:showMoreDrawer?T.gold:T.textdim,padding:'6px 2px',transition:'color 0.15s',WebkitTapHighlightColor:'transparent'}}>
+            <span style={{fontSize:18,lineHeight:1}}>☰</span>
+            <span style={{fontSize:10,fontWeight:showMoreDrawer?700:400}}>More</span>
+            {showMoreDrawer&&<div style={{position:'absolute',bottom:0,width:24,height:2,background:T.gold,borderRadius:1}}/>}
+          </button>
+        </div>
+      </nav>
 
       <style>{`
         @keyframes throb { 0%,100%{opacity:0.15;transform:scale(0.7)} 50%{opacity:1;transform:scale(1)} }
@@ -1260,7 +1482,13 @@ export default function StudioPage() {
         * { box-sizing:border-box; }
         details summary::-webkit-details-marker { display:none; }
         .qa-grid { grid-template-columns: repeat(3,1fr); }
-        @media(max-width:560px){ .qa-grid { grid-template-columns:1fr 1fr !important; } }
+        @media(max-width:767px){
+          .qa-grid { grid-template-columns:1fr 1fr !important; }
+          .mobile-view-pad { padding-bottom: 72px !important; }
+          .compose-wrap { padding-left:12px !important; padding-right:12px !important; }
+          .chat-thread-inner { padding:16px 14px 12px !important; }
+          .view-scroll-content { padding:20px 16px !important; }
+        }
       `}</style>
     </div>
   )
