@@ -1115,7 +1115,7 @@ export default function StudioPage() {
   // MAIN RENDER
   // ════════════════════════════════════════════════════════════════════════════
   return (
-    <div style={{display:'flex',height:'100dvh',overflow:'hidden',background:T.bg,color:T.text,fontFamily:FONT,fontSize:15}}>
+    <div className="app-root" style={{display:'flex',background:T.bg,color:T.text,fontFamily:FONT,fontSize:15}}>
 
       {/* ────────────── LEFT SIDEBAR ────────────── */}
       <aside style={{width:sideW,background:T.sidebar,borderRight:`1px solid ${T.border}`,flexDirection:'column',flexShrink:0,transition:'width 0.2s',overflow:'hidden'}} className="hidden md:flex">
@@ -1278,11 +1278,11 @@ export default function StudioPage() {
           {view === 'dashboard'   && <ViewDashboard/>}
           {view === 'workflows'   && <ViewWorkflows/>}
           {view === 'agents'      && <ViewAgents/>}
-          {view === 'connections' && <ViewConnections T={T} connWizard={connWizard} setConnWizard={setConnWizard} connWaStep={connWaStep} setConnWaStep={setConnWaStep} connWaFields={connWaFields} setConnWaFields={setConnWaFields} connWaCopied={connWaCopied} setConnWaCopied={setConnWaCopied}/>}
-          {view === 'docs'        && <ViewDocs T={T} docsFileRef={docsFileRef} docsUploadedFiles={docsUploadedFiles} setDocsUploadedFiles={setDocsUploadedFiles}/>}
-          {view === 'done'        && <ViewDone T={T} doneFilter={doneFilter} setDoneFilter={setDoneFilter}/>}
-          {view === 'feedback'    && <ViewFeedback T={T} feedbackText={feedbackText} setFeedbackText={setFeedbackText} feedbackSent={feedbackSent} setFeedbackSent={setFeedbackSent} feedbackRating={feedbackRating} setFeedbackRating={setFeedbackRating}/>}
-          {view === 'support'     && <ViewSupport T={T} supportGuide={supportGuide} setSupportGuide={setSupportGuide}/>}
+          {view === 'connections' && ViewConnections({ T, connWizard, setConnWizard, connWaStep, setConnWaStep, connWaFields, setConnWaFields, connWaCopied, setConnWaCopied })}
+          {view === 'docs'        && ViewDocs({ T, docsFileRef, docsUploadedFiles, setDocsUploadedFiles })}
+          {view === 'done'        && ViewDone({ T, doneFilter, setDoneFilter })}
+          {view === 'feedback'    && ViewFeedback({ T, feedbackText, setFeedbackText, feedbackSent, setFeedbackSent, feedbackRating, setFeedbackRating })}
+          {view === 'support'     && ViewSupport({ T, supportGuide, setSupportGuide })}
         </div>
       </div>
 
@@ -1351,6 +1351,8 @@ export default function StudioPage() {
       </nav>
 
       <style>{`
+        /* Height fallback: 100vh for browsers that don't support dvh (iOS < 16) */
+        .app-root { height: 100vh; height: 100dvh; overflow: hidden; }
         @keyframes throb { 0%,100%{opacity:0.15;transform:scale(0.7)} 50%{opacity:1;transform:scale(1)} }
         @keyframes spin   { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         textarea::placeholder { color:${T.textdim}; }
@@ -1377,7 +1379,7 @@ export default function StudioPage() {
           .docs-folders     { grid-template-columns:1fr 1fr !important; }
           .avail-grid       { grid-template-columns:1fr !important; }
           .support-cards    { grid-template-columns:1fr !important; }
-          .view-scroll      { padding-bottom:56px; }
+          .view-scroll      { padding-bottom:72px; }
           .compose-area     { padding-bottom:calc(56px + max(14px, env(safe-area-inset-bottom))) !important; }
           .compose-inner    { padding-left:12px !important; padding-right:12px !important; }
           .chat-thread-inner{ padding:16px 12px 16px !important; }
