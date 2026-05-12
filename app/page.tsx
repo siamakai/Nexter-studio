@@ -164,6 +164,406 @@ function LogoMark({ size = 32 }: { size?: number }) {
   )
 }
 
+// ─── Module-level shared constants ───────────────────────────────────────────
+const FONT = "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+const MONO = "'JetBrains Mono','Fira Code',monospace"
+type Tk = ReturnType<typeof tokens>
+
+// ─── Badge (module-level so view components can use it) ───────────────────────
+function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {
+  return <span style={{fontSize:10,fontWeight:600,color,background:bg,borderRadius:999,padding:'2px 8px',fontFamily:MONO,flexShrink:0}}>{label}</span>
+}
+
+// ─── ViewDone ─────────────────────────────────────────────────────────────────
+function ViewDone({ T, doneFilter, setDoneFilter }: { T:Tk; doneFilter:string; setDoneFilter:(f:string)=>void }) {
+  const cats = ['All','Email','CRM','Calendar','AI']
+  const filtered = doneFilter==='All' ? DONE_LOG : DONE_LOG.filter(d=>d.cat===doneFilter)
+  const catColors: Record<string,{bg:string;color:string}> = {
+    Email:   {bg:`${T.blue}18`,    color:T.blue   },
+    CRM:     {bg:`${T.orange}18`,  color:T.orange },
+    Calendar:{bg:`${T.green}18`,   color:T.green  },
+    AI:      {bg:`${T.gold}18`,    color:T.gold   },
+  }
+  return (
+    <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 100px'}}>
+      <div style={{marginBottom:24}}>
+        <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Done For You</h1>
+        <p style={{margin:0,fontSize:14,color:T.textmd}}>Everything your AI executed automatically — full audit trail.</p>
+      </div>
+      <div style={{display:'flex',gap:6,marginBottom:20,flexWrap:'wrap'}}>
+        {cats.map(c=>(
+          <button key={c} onClick={()=>setDoneFilter(c)}
+            style={{fontSize:12,fontWeight:600,color:doneFilter===c?T.gold:T.textmd,background:doneFilter===c?T.golddim:'transparent',border:`1px solid ${doneFilter===c?T.goldbrdr:T.border}`,borderRadius:999,padding:'5px 14px',cursor:'pointer',fontFamily:MONO,transition:'all 0.12s'}}>
+            {c}
+          </button>
+        ))}
+        <span style={{marginLeft:'auto',fontSize:12,color:T.textdim,fontFamily:MONO,alignSelf:'center'}}>{filtered.length} actions</span>
+      </div>
+      <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,overflow:'hidden',boxShadow:T.shadowsm}}>
+        {filtered.map((d,i)=>(
+          <div key={d.id} style={{display:'flex',alignItems:'center',gap:14,padding:'14px 20px',borderBottom:i<filtered.length-1?`1px solid ${T.divider}`:'none',transition:'background 0.1s'}}
+            onMouseEnter={e=>(e.currentTarget as HTMLDivElement).style.background=T.sideHov}
+            onMouseLeave={e=>(e.currentTarget as HTMLDivElement).style.background='transparent'}>
+            <div style={{width:36,height:36,borderRadius:9,background:catColors[d.cat]?.bg||T.golddim,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{d.icon}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{d.label}</p>
+              <p style={{margin:'2px 0 0',fontSize:12,color:T.textmd,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.detail}</p>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+              <Badge label={d.cat} color={catColors[d.cat]?.color||T.gold} bg={catColors[d.cat]?.bg||T.golddim}/>
+              <span style={{fontSize:11,color:T.textdim,fontFamily:MONO,whiteSpace:'nowrap'}}>{d.time}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── ViewFeedback ─────────────────────────────────────────────────────────────
+function ViewFeedback({ T, feedbackText, setFeedbackText, feedbackSent, setFeedbackSent, feedbackRating, setFeedbackRating }: {
+  T:Tk; feedbackText:string; setFeedbackText:React.Dispatch<React.SetStateAction<string>>
+  feedbackSent:boolean; setFeedbackSent:React.Dispatch<React.SetStateAction<boolean>>
+  feedbackRating:number; setFeedbackRating:React.Dispatch<React.SetStateAction<number>>
+}) {
+  const emojis = ['😞','😐','🙂','😊','🤩']
+  function sendFeedback() {
+    if (!feedbackText.trim()) return
+    const ratingLabel = feedbackRating >= 0 ? `Rating: ${emojis[feedbackRating]} (${feedbackRating+1}/5)\n\n` : ''
+    const subject = encodeURIComponent('VA App Feedback')
+    const body = encodeURIComponent(`${ratingLabel}${feedbackText}`)
+    window.location.href = `mailto:info@i-review.ai?subject=${subject}&body=${body}`
+    setFeedbackSent(true)
+  }
+  return (
+    <div className="view-pad" style={{maxWidth:600,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
+      <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Feedback</h1>
+      <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Help us improve VA App. Sent directly to info@i-review.ai.</p>
+      {feedbackSent ? (
+        <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'48px',textAlign:'center',boxShadow:T.shadowsm}}>
+          <span style={{fontSize:40,display:'block',marginBottom:12}}>🙏</span>
+          <p style={{margin:'0 0 6px',fontSize:16,fontWeight:700,color:T.text}}>Thank you!</p>
+          <p style={{margin:'0 0 16px',fontSize:14,color:T.textmd}}>Your feedback is on its way to info@i-review.ai.</p>
+          <button onClick={()=>{setFeedbackSent(false);setFeedbackText('');setFeedbackRating(-1)}}
+            style={{fontSize:13,color:T.gold,background:'none',border:`1px solid ${T.goldbrdr}`,borderRadius:8,padding:'8px 20px',cursor:'pointer'}}>
+            Send more feedback
+          </button>
+        </div>
+      ) : (
+        <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'24px',boxShadow:T.shadowsm}}>
+          <p style={{margin:'0 0 8px',fontSize:13,fontWeight:600,color:T.textmd}}>How would you rate your experience?</p>
+          <div style={{display:'flex',gap:8,marginBottom:20}}>
+            {emojis.map((e,i)=>(
+              <button key={i} onClick={()=>setFeedbackRating(i)}
+                style={{fontSize:24,background:feedbackRating===i?T.golddim:'none',border:`1px solid ${feedbackRating===i?T.goldbrdr:T.border}`,borderRadius:8,padding:'8px 14px',cursor:'pointer',transition:'all 0.12s',transform:feedbackRating===i?'scale(1.15)':'scale(1)'}}
+                onMouseEnter={e2=>{if(feedbackRating!==i){e2.currentTarget.style.borderColor=T.goldbrdr;e2.currentTarget.style.background=T.golddim}}}
+                onMouseLeave={e2=>{if(feedbackRating!==i){e2.currentTarget.style.borderColor=T.border;e2.currentTarget.style.background='none'}}}>
+                {e}
+              </button>
+            ))}
+          </div>
+          <p style={{margin:'0 0 6px',fontSize:13,fontWeight:600,color:T.textmd}}>What&apos;s on your mind?</p>
+          <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} placeholder="Feature request, bug report, or general thoughts…"
+            style={{width:'100%',background:T.inputbg,border:`1px solid ${T.bordmd}`,borderRadius:8,padding:'12px 14px',fontSize:14,color:T.text,fontFamily:FONT,outline:'none',resize:'vertical',minHeight:100,marginBottom:14,boxSizing:'border-box'}}/>
+          <button onClick={sendFeedback} disabled={!feedbackText.trim()}
+            style={{background:feedbackText.trim()?T.gold:'transparent',color:feedbackText.trim()?'#fff':T.textdim,border:`1px solid ${feedbackText.trim()?T.gold:T.border}`,borderRadius:8,padding:'10px 24px',cursor:feedbackText.trim()?'pointer':'not-allowed',fontSize:14,fontWeight:600,boxShadow:feedbackText.trim()?`0 2px 8px ${T.goldglo}`:'none',transition:'all 0.15s'}}>
+            Send Feedback → info@i-review.ai
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── ViewSupport ──────────────────────────────────────────────────────────────
+function ViewSupport({ T, supportGuide, setSupportGuide }: { T:Tk; supportGuide:string|null; setSupportGuide:React.Dispatch<React.SetStateAction<string|null>> }) {
+  const setupSteps = [
+    { id:'anthropic', icon:'🤖', title:'Step 1 — Get Your Claude API Key', time:'5 min', required:true, steps:['Go to console.anthropic.com and create an account','Click "Get API Keys" → Create new key → copy it','Send the key to your Nexter AI setup contact','This key is private — never share it publicly','You are billed directly by Anthropic based on usage'], link:'https://console.anthropic.com', linkLabel:'Open Anthropic Console ↗' },
+    { id:'gmail', icon:'📧', title:'Step 2 — Connect Gmail', time:'3 min', required:true, steps:['In this app, go to Connections → click "Connect" next to Gmail','Sign in with your Google account and allow the requested permissions','The app needs: read emails, send emails, read calendar','Once connected, the green dot appears — the AI can now read and send email on your behalf','To disconnect at any time: Google Account → Security → Third-party access'], link:'https://myaccount.google.com/permissions', linkLabel:'Manage Google Permissions ↗' },
+    { id:'outlook', icon:'💼', title:'Step 3 — Connect Microsoft Outlook (optional)', time:'3 min', required:false, steps:['In Connections → click "Connect" next to Microsoft Outlook','Sign in with your Microsoft 365 account','The app reads both your Outlook inbox and your Outlook Calendar','If you use both Gmail and Outlook, the AI checks both automatically'], link:'https://myaccount.microsoft.com', linkLabel:'Manage Microsoft Permissions ↗' },
+    { id:'ghl', icon:'🏢', title:'Step 4 — Connect GHL CRM (optional)', time:'5 min', required:false, steps:['Log into your Go High Level account','Go to Settings → Integrations → Private Integrations','Create a new integration and copy the token (starts with pit-...)','Also copy your Location ID from Settings → Business Info','Send both to your Nexter AI setup contact to add to the system'], link:'https://app.gohighlevel.com', linkLabel:'Open GHL ↗' },
+    { id:'zoom', icon:'📹', title:'Step 5 — Connect Zoom (optional)', time:'5 min', required:false, steps:['Go to marketplace.zoom.us → Build App → Server-to-Server OAuth','Create an app, copy Account ID, Client ID, and Client Secret','Enable scopes: meeting:write, meeting:read, cloud_recording:read','Send credentials to your Nexter AI setup contact','Once connected, the AI can create Zoom meetings and read recording summaries'], link:'https://marketplace.zoom.us', linkLabel:'Open Zoom Marketplace ↗' },
+    { id:'calendly', icon:'📅', title:'Step 6 — Connect Calendly (optional)', time:'2 min', required:false, steps:['Log into Calendly → Integrations → API & Webhooks','Create a Personal Access Token and copy it','Send to your Nexter AI setup contact','The AI will sync booking contacts directly to your CRM'], link:'https://calendly.com/integrations/api_webhooks', linkLabel:'Open Calendly API ↗' },
+  ]
+  const faqs = [
+    { q:'How do I activate a workflow?',           a:'Go to Workflows → find the workflow → toggle the switch. It runs automatically from that point forward.' },
+    { q:'Can I use the AI in multiple languages?', a:'Yes. Just write in your preferred language — the AI responds in the same language.' },
+    { q:'Where are my conversations stored?',      a:'Conversations are stored securely in your own private database. No data is shared with other clients.' },
+    { q:'How do I get a morning briefing?',        a:'Ask: "Give me my morning briefing" or click Morning Brief in Dashboard Quick Actions. It pulls email, calendar, and leads together.' },
+    { q:'What does the AI cost me?',               a:'You pay Anthropic directly per message. Typical usage costs $5–30/month depending on volume. You control your own API key and budget.' },
+    { q:'Can I request custom workflows?',         a:'Yes. Contact info@i-review.ai describing what you need. Custom workflows are built and added to your instance.' },
+    { q:'How do I disconnect a service?',          a:'Go to the service settings (e.g. Google Account → Security → Third-party access) and remove the app. The connection will stop immediately.' },
+  ]
+  return (
+    <div className="view-pad" style={{maxWidth:780,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
+      <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Help Center</h1>
+      <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Setup guides, FAQs, and how to reach us.</p>
+      <div className="support-cards" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:32}}>
+        {[
+          {icon:'📧',label:'Email Support',    desc:'info@i-review.ai',        action:()=>{ window.location.href='mailto:info@i-review.ai?subject=VA App Support' }},
+          {icon:'💬',label:'WhatsApp',         desc:'Quick reply, usually same day', action:()=>window.open('https://wa.me/message/placeholder','_blank','noopener')},
+        ].map(item=>(
+          <button key={item.label} onClick={item.action}
+            style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 18px',textAlign:'left',cursor:'pointer',boxShadow:T.shadowsm,transition:'all 0.15s',display:'flex',alignItems:'center',gap:14}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.transform='translateY(-1px)'}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=T.cardBord;e.currentTarget.style.transform='translateY(0)'}}>
+            <span style={{fontSize:28}}>{item.icon}</span>
+            <div><p style={{margin:'0 0 2px',fontSize:13,fontWeight:600,color:T.text}}>{item.label}</p><p style={{margin:0,fontSize:12,color:T.textmd}}>{item.desc}</p></div>
+          </button>
+        ))}
+      </div>
+      <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Setup Guide — Connect Your Tools</p>
+      <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:28}}>
+        {setupSteps.map(step=>(
+          <div key={step.id} style={{background:T.card,border:`1px solid ${supportGuide===step.id?T.goldbrdr:T.cardBord}`,borderRadius:12,overflow:'hidden',boxShadow:T.shadowsm,transition:'all 0.15s'}}>
+            <button onClick={()=>setSupportGuide(supportGuide===step.id?null:step.id)}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 18px',background:'none',border:'none',cursor:'pointer',textAlign:'left'}}>
+              <span style={{fontSize:20,flexShrink:0}}>{step.icon}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{step.title}</p>
+                <p style={{margin:'2px 0 0',fontSize:11,color:T.textdim,fontFamily:MONO}}>~{step.time} · {step.required?'Recommended':'Optional'}</p>
+              </div>
+              <span style={{fontSize:16,color:T.textdim,transition:'transform 0.2s',transform:supportGuide===step.id?'rotate(180deg)':'rotate(0deg)',display:'inline-block'}}>›</span>
+            </button>
+            {supportGuide===step.id && (
+              <div style={{padding:'0 18px 16px',borderTop:`1px solid ${T.divider}`}}>
+                <ol style={{margin:'12px 0 0',paddingLeft:20,display:'flex',flexDirection:'column',gap:8}}>
+                  {step.steps.map((s,i)=><li key={i} style={{fontSize:13,color:T.textmd,lineHeight:1.6}}>{s}</li>)}
+                </ol>
+                <a href={step.link} target="_blank" rel="noopener noreferrer"
+                  style={{display:'inline-block',marginTop:12,fontSize:12,color:T.gold,fontWeight:600,fontFamily:MONO,textDecoration:'none',border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'5px 12px',background:T.golddim}}>
+                  {step.linkLabel}
+                </a>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Frequently Asked Questions</p>
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {faqs.map((f,i)=>(
+          <details key={i} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:10,padding:'13px 16px',cursor:'pointer'}}>
+            <summary style={{fontSize:13,fontWeight:600,color:T.text,listStyle:'none',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              {f.q}<span style={{color:T.textdim,fontWeight:400,marginLeft:8}}>+</span>
+            </summary>
+            <p style={{margin:'10px 0 0',fontSize:13,color:T.textmd,lineHeight:1.65}}>{f.a}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── ViewDocs ─────────────────────────────────────────────────────────────────
+function ViewDocs({ T, docsFileRef, docsUploadedFiles, setDocsUploadedFiles }: {
+  T:Tk; docsFileRef:React.RefObject<HTMLInputElement | null>
+  docsUploadedFiles:string[]; setDocsUploadedFiles:React.Dispatch<React.SetStateAction<string[]>>
+}) {
+  const folders = ['Contracts', 'Proposals', 'Meeting Notes', 'Templates', 'Reports']
+  function handleDocFiles(files: FileList | null) {
+    if (!files) return
+    setDocsUploadedFiles(p => [...p, ...Array.from(files).map(f => f.name)])
+  }
+  return (
+    <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 100px'}}>
+      <input ref={docsFileRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg" style={{display:'none'}} onChange={e=>handleDocFiles(e.target.files)}/>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:28,flexWrap:'wrap',gap:12}}>
+        <div>
+          <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Docs</h1>
+          <p style={{margin:0,fontSize:14,color:T.textmd}}>Upload documents and reference them in any AI conversation.</p>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={()=>window.open('https://drive.google.com','_blank','noopener')}
+            style={{background:'transparent',color:T.textmd,border:`1px solid ${T.border}`,borderRadius:8,padding:'9px 16px',cursor:'pointer',fontSize:13,fontWeight:600,transition:'all 0.12s'}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.color=T.text}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.textmd}}>
+            💾 Open Drive ↗
+          </button>
+          <button onClick={()=>docsFileRef.current?.click()}
+            style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>
+            + Upload
+          </button>
+        </div>
+      </div>
+      {docsUploadedFiles.length > 0 && (
+        <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:10,padding:'14px 18px',marginBottom:16,boxShadow:T.shadowsm}}>
+          <p style={{margin:'0 0 8px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Uploaded this session</p>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {docsUploadedFiles.map((f,i)=><span key={i} style={{fontSize:12,background:T.golddim,color:T.gold,border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'3px 10px',fontFamily:MONO}}>📄 {f}</span>)}
+          </div>
+        </div>
+      )}
+      <div className="docs-folders" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:24}}>
+        {folders.map(f=>(
+          <div key={f} onClick={()=>docsFileRef.current?.click()}
+            style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'18px',cursor:'pointer',transition:'all 0.15s',boxShadow:T.shadowsm}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.transform='translateY(-2px)'}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=T.cardBord;e.currentTarget.style.transform='translateY(0)'}}>
+            <span style={{fontSize:28,display:'block',marginBottom:8}}>📁</span>
+            <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{f}</p>
+            <p style={{margin:'3px 0 0',fontSize:11,color:T.textdim}}>0 documents · click to upload</p>
+          </div>
+        ))}
+      </div>
+      <div onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleDocFiles(e.dataTransfer.files)}}
+        style={{background:T.card,border:`2px dashed ${T.border}`,borderRadius:12,padding:'40px',textAlign:'center',cursor:'pointer',transition:'border-color 0.15s'}}
+        onMouseEnter={e=>e.currentTarget.style.borderColor=T.goldbrdr}
+        onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+        <span style={{fontSize:36,display:'block',marginBottom:12}}>☁️</span>
+        <p style={{margin:'0 0 6px',fontSize:15,fontWeight:600,color:T.text}}>Drop files here or click to upload</p>
+        <p style={{margin:'0 0 16px',fontSize:13,color:T.textmd}}>PDF, Word, Excel, images · Max 25MB per file</p>
+        <button onClick={()=>docsFileRef.current?.click()}
+          style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 20px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>
+          Choose files
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── ViewConnections wizard sub-components ────────────────────────────────────
+const WEBHOOK_URL  = 'https://va.nexterai.agency/api/webhooks/whatsapp'
+const VERIFY_TOKEN = 'nexterai_whatsapp_2026'
+type WaFields = { phone_number_id:string; access_token:string; business_account_id:string }
+
+function WizardOverlay({ T, children, onClose }: { T:Tk; children:React.ReactNode; onClose:()=>void }) {
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)'}} onClick={onClose}>
+      <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:16,padding:'32px 36px',maxWidth:540,width:'90%',boxShadow:T.shadow,position:'relative'}} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} style={{position:'absolute',top:16,right:16,background:'none',border:'none',color:T.textdim,fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function WhatsAppWizard({ T, waStep, setWaStep, waFields, setWaFields, waCopied, setWaCopied, onClose }: {
+  T:Tk; waStep:number; setWaStep:React.Dispatch<React.SetStateAction<number>>
+  waFields:WaFields; setWaFields:React.Dispatch<React.SetStateAction<WaFields>>
+  waCopied:boolean; setWaCopied:React.Dispatch<React.SetStateAction<boolean>>
+  onClose:()=>void
+}) {
+  function copyText(text:string) { navigator.clipboard.writeText(text).then(()=>{ setWaCopied(true); setTimeout(()=>setWaCopied(false),2000) }) }
+  const steps = [
+    { num:1, title:'Create a Meta App', body:<>Go to <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener" style={{color:T.gold}}>developers.facebook.com/apps</a> → Create App → Choose <strong style={{color:T.text}}>Business</strong> type → Add <strong style={{color:T.text}}>WhatsApp</strong> product.</> },
+    { num:2, title:'Get your credentials', body:<>In WhatsApp → API Setup, copy:<br/><br/><strong style={{color:T.text}}>Phone Number ID</strong> — shown under &quot;From&quot; number<br/><strong style={{color:T.text}}>Access Token</strong> — temporary token (or generate permanent)<br/><strong style={{color:T.text}}>WhatsApp Business Account ID</strong> — shown at top of the page</> },
+    { num:3, title:'Register webhook', body:<>In WhatsApp → Configuration → Webhook, paste these values:<br/><br/><div style={{background:T.inputbg,border:`1px solid ${T.border}`,borderRadius:8,padding:'12px 14px',marginTop:8}}><p style={{margin:'0 0 6px',fontSize:11,color:T.textdim,fontFamily:MONO}}>CALLBACK URL</p><div style={{display:'flex',gap:8,alignItems:'center'}}><code style={{flex:1,fontSize:12,color:T.text,fontFamily:MONO,wordBreak:'break-all'}}>{WEBHOOK_URL}</code><button onClick={()=>copyText(WEBHOOK_URL)} style={{fontSize:11,padding:'4px 10px',background:T.golddim,border:`1px solid ${T.goldbrdr}`,borderRadius:6,color:T.gold,cursor:'pointer',fontFamily:MONO,flexShrink:0}}>{waCopied?'Copied!':'Copy'}</button></div><hr style={{border:'none',borderTop:`1px solid ${T.border}`,margin:'10px 0'}}/><p style={{margin:'0 0 4px',fontSize:11,color:T.textdim,fontFamily:MONO}}>VERIFY TOKEN</p><code style={{fontSize:12,color:T.text,fontFamily:MONO}}>{VERIFY_TOKEN}</code></div><p style={{margin:'10px 0 0',fontSize:12,color:T.textmd}}>Subscribe to the <strong style={{color:T.text}}>messages</strong> webhook field.</p></> },
+    { num:4, title:'Enter your credentials', body:<div style={{display:'flex',flexDirection:'column',gap:12}}>{(['phone_number_id','access_token','business_account_id'] as const).map(key=>(<div key={key}><label style={{display:'block',fontSize:11,color:T.textdim,fontFamily:MONO,marginBottom:4,textTransform:'uppercase',letterSpacing:'0.08em'}}>{key.replace(/_/g,' ')}</label><input value={waFields[key]} onChange={e=>setWaFields(p=>({...p,[key]:e.target.value}))} placeholder={key==='phone_number_id'?'123456789012345':key==='access_token'?'EAAxxxxxx...':'987654321098765'} style={{width:'100%',padding:'9px 12px',background:T.inputbg,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,fontSize:13,fontFamily:MONO,outline:'none',boxSizing:'border-box'}}/></div>))}<p style={{margin:'4px 0 0',fontSize:12,color:T.textmd}}>Add these to Vercel → Environment Variables, then redeploy.</p></div> },
+  ]
+  const step = steps[waStep-1]
+  return (
+    <WizardOverlay T={T} onClose={onClose}>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+        <span style={{fontSize:28}}>📱</span>
+        <div><h2 style={{margin:0,fontSize:18,fontWeight:700,color:T.text}}>Connect WhatsApp Business</h2><p style={{margin:'2px 0 0',fontSize:12,color:T.textmd}}>Step {waStep} of {steps.length}</p></div>
+      </div>
+      <div style={{display:'flex',gap:6,marginBottom:24}}>{steps.map(s=><div key={s.num} style={{flex:1,height:3,borderRadius:2,background:waStep>=s.num?T.gold:T.border,transition:'background 0.2s'}}/>)}</div>
+      <h3 style={{margin:'0 0 12px',fontSize:15,fontWeight:600,color:T.text}}>{step.num}. {step.title}</h3>
+      <div style={{fontSize:13,color:T.textmd,lineHeight:1.7}}>{step.body}</div>
+      <div style={{display:'flex',gap:10,marginTop:24,justifyContent:'flex-end'}}>
+        {waStep>1 && <button onClick={()=>setWaStep(s=>s-1)} style={{padding:'8px 18px',background:'none',border:`1px solid ${T.border}`,borderRadius:8,color:T.textmd,cursor:'pointer',fontSize:13}}>Back</button>}
+        {waStep<steps.length
+          ? <button onClick={()=>setWaStep(s=>s+1)} style={{padding:'8px 20px',background:T.gold,border:'none',borderRadius:8,color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}>Next →</button>
+          : <button onClick={onClose} style={{padding:'8px 20px',background:T.gold,border:'none',borderRadius:8,color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}>Done ✓</button>
+        }
+      </div>
+    </WizardOverlay>
+  )
+}
+
+function LinkedInWizard({ T, onClose }: { T:Tk; onClose:()=>void }) {
+  return (
+    <WizardOverlay T={T} onClose={onClose}>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+        <span style={{fontSize:28}}>🔗</span>
+        <div><h2 style={{margin:0,fontSize:18,fontWeight:700,color:T.text}}>Connect LinkedIn</h2><p style={{margin:'2px 0 0',fontSize:12,color:T.textmd}}>One-click OAuth connection</p></div>
+      </div>
+      <div style={{background:T.inputbg,border:`1px solid ${T.border}`,borderRadius:10,padding:'16px 18px',marginBottom:20}}>
+        <p style={{margin:'0 0 8px',fontSize:13,fontWeight:600,color:T.text}}>Before connecting:</p>
+        <ol style={{margin:0,paddingLeft:18,fontSize:13,color:T.textmd,lineHeight:1.8}}>
+          <li>Go to <a href="https://www.linkedin.com/developers/apps/new" target="_blank" rel="noopener" style={{color:T.gold}}>LinkedIn Developer Apps</a> → Create app</li>
+          <li>Add products: <strong style={{color:T.text}}>Share on LinkedIn</strong> + <strong style={{color:T.text}}>Sign In with LinkedIn</strong></li>
+          <li>Set redirect URL to: <code style={{fontSize:11,fontFamily:MONO,color:T.gold}}>https://va.nexterai.agency/api/auth/linkedin/callback</code></li>
+          <li>Copy Client ID and Client Secret → add to Vercel env vars:<br/><code style={{fontSize:11,fontFamily:MONO,color:T.text}}>LINKEDIN_CLIENT_ID</code> and <code style={{fontSize:11,fontFamily:MONO,color:T.text}}>LINKEDIN_CLIENT_SECRET</code></li>
+        </ol>
+      </div>
+      <p style={{margin:'0 0 16px',fontSize:13,color:T.textmd}}>Once credentials are in Vercel, click below to authorize:</p>
+      <button onClick={()=>window.open('/api/auth/linkedin','_self')}
+        style={{width:'100%',padding:'12px',background:'#0A66C2',border:'none',borderRadius:10,color:'#fff',fontSize:14,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+        <span style={{fontSize:18}}>🔗</span> Connect with LinkedIn
+      </button>
+      <p style={{margin:'12px 0 0',fontSize:11,color:T.textdim,textAlign:'center'}}>You&apos;ll be redirected to LinkedIn to approve access, then brought back with your access token.</p>
+    </WizardOverlay>
+  )
+}
+
+function ViewConnections({ T, connWizard, setConnWizard, connWaStep, setConnWaStep, connWaFields, setConnWaFields, connWaCopied, setConnWaCopied }: {
+  T:Tk
+  connWizard:'whatsapp'|'linkedin'|null; setConnWizard:React.Dispatch<React.SetStateAction<'whatsapp'|'linkedin'|null>>
+  connWaStep:number; setConnWaStep:React.Dispatch<React.SetStateAction<number>>
+  connWaFields:WaFields; setConnWaFields:React.Dispatch<React.SetStateAction<WaFields>>
+  connWaCopied:boolean; setConnWaCopied:React.Dispatch<React.SetStateAction<boolean>>
+}) {
+  const connected = CONNECTIONS.filter(c=>c.connected)
+  const available = CONNECTIONS.filter(c=>!c.connected)
+  const openUrl = (url:string) => window.open(url,'_blank','noopener')
+  const onClose = () => { setConnWizard(null); setConnWaStep(1); setConnWaFields({phone_number_id:'',access_token:'',business_account_id:''}) }
+  function handleConnect(c: typeof CONNECTIONS[0]) {
+    if (c.id==='whatsapp') { setConnWizard('whatsapp'); setConnWaStep(1) }
+    else if (c.id==='linkedin') { setConnWizard('linkedin') }
+    else openUrl(c.addUrl)
+  }
+  return (
+    <div className="view-pad" style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
+      {connWizard==='whatsapp' && <WhatsAppWizard T={T} waStep={connWaStep} setWaStep={setConnWaStep} waFields={connWaFields} setWaFields={setConnWaFields} waCopied={connWaCopied} setWaCopied={setConnWaCopied} onClose={onClose}/>}
+      {connWizard==='linkedin' && <LinkedInWizard T={T} onClose={onClose}/>}
+      <div style={{marginBottom:28}}>
+        <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Connections</h1>
+        <p style={{margin:0,fontSize:14,color:T.textmd}}>Manage your integrations. Connect in under 30 seconds.</p>
+      </div>
+      <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Active · {connected.length} connected</p>
+      <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:24}}>
+        {connected.map(c=>(
+          <div key={c.id} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 20px',display:'flex',alignItems:'center',gap:14,boxShadow:T.shadowsm}}>
+            <span style={{fontSize:22,flexShrink:0}}>{c.icon}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{margin:0,fontSize:14,fontWeight:600,color:T.text}}>{c.name}</p>
+              <p style={{margin:'2px 0 0',fontSize:12,color:T.textmd}}>{c.desc}</p>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+              <div style={{width:6,height:6,borderRadius:'50%',background:T.green}}/>
+              <span style={{fontSize:11,color:T.green,fontFamily:MONO,fontWeight:600}}>Connected</span>
+              <button onClick={()=>openUrl(c.manageUrl)} style={{fontSize:11,color:T.textdim,background:'none',border:`1px solid ${T.border}`,borderRadius:6,padding:'4px 10px',cursor:'pointer',fontFamily:MONO,transition:'all 0.12s'}}
+                onMouseEnter={e=>{e.currentTarget.style.color=T.gold;e.currentTarget.style.borderColor=T.goldbrdr}}
+                onMouseLeave={e=>{e.currentTarget.style.color=T.textdim;e.currentTarget.style.borderColor=T.border}}>
+                Manage ↗
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Available — click to connect</p>
+      <div className="avail-grid" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
+        {available.map(c=>(
+          <div key={c.id} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 18px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',opacity:0.8,transition:'all 0.15s'}}
+            onClick={()=>handleConnect(c)}
+            onMouseEnter={e=>{e.currentTarget.style.opacity='1';e.currentTarget.style.borderColor=T.goldbrdr}}
+            onMouseLeave={e=>{e.currentTarget.style.opacity='0.8';e.currentTarget.style.borderColor=T.cardBord}}>
+            <span style={{fontSize:20,flexShrink:0}}>{c.icon}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{c.name}</p>
+              <p style={{margin:'1px 0 0',fontSize:11,color:T.textmd,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.desc}</p>
+            </div>
+            <button onClick={e=>{e.stopPropagation();handleConnect(c)}} style={{fontSize:11,color:T.gold,background:T.golddim,border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'5px 12px',cursor:'pointer',fontFamily:MONO,fontWeight:600,flexShrink:0}}>
+              + Connect
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function StudioPage() {
   const router = useRouter()
@@ -360,11 +760,6 @@ export default function StudioPage() {
     )
   }
 
-  // ─── Badge ────────────────────────────────────────────────────────────────
-  function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {
-    return <span style={{fontSize:10,fontWeight:600,color,background:bg,borderRadius:999,padding:'2px 8px',fontFamily:MONO,flexShrink:0}}>{label}</span>
-  }
-
   // ═══════════════════════════════════════════════════════════════════════════
   // VIEWS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -514,529 +909,6 @@ export default function StudioPage() {
                 Use now →
               </button>
             </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Connections ───────────────────────────────────────────────────────────
-  function ViewConnections() {
-    const connected = CONNECTIONS.filter(c=>c.connected)
-    const available = CONNECTIONS.filter(c=>!c.connected)
-    const open = (url: string) => window.open(url, '_blank', 'noopener')
-
-    const wizard  = connWizard;  const setWizard  = setConnWizard
-    const waStep  = connWaStep;  const setWaStep  = setConnWaStep
-    const waFields= connWaFields;const setWaFields= setConnWaFields
-    const waCopied= connWaCopied;const setWaCopied= setConnWaCopied
-
-    const WEBHOOK_URL = 'https://va.nexterai.agency/api/webhooks/whatsapp'
-    const VERIFY_TOKEN = 'nexterai_whatsapp_2026'
-
-    function copyText(text: string, setCopied: (v:boolean)=>void) {
-      navigator.clipboard.writeText(text).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000) })
-    }
-
-    function WizardOverlay({ children }: { children: React.ReactNode }) {
-      return (
-        <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)'}}
-          onClick={()=>{setWizard(null);setWaStep(1);setWaFields({phone_number_id:'',access_token:'',business_account_id:''})}}>
-          <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:16,padding:'32px 36px',maxWidth:540,width:'90%',boxShadow:T.shadow,position:'relative'}}
-            onClick={e=>e.stopPropagation()}>
-            <button onClick={()=>{setWizard(null);setWaStep(1)}}
-              style={{position:'absolute',top:16,right:16,background:'none',border:'none',color:T.textdim,fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
-            {children}
-          </div>
-        </div>
-      )
-    }
-
-    function WhatsAppWizard() {
-      const steps = [
-        { num:1, title:'Create a Meta App', body: <>Go to <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener" style={{color:T.gold}}>developers.facebook.com/apps</a> → Create App → Choose <strong style={{color:T.text}}>Business</strong> type → Add <strong style={{color:T.text}}>WhatsApp</strong> product.</> },
-        { num:2, title:'Get your credentials', body: <>In WhatsApp → API Setup, copy:<br/><br/><strong style={{color:T.text}}>Phone Number ID</strong> — shown under "From" number<br/><strong style={{color:T.text}}>Access Token</strong> — temporary token (or generate permanent)<br/><strong style={{color:T.text}}>WhatsApp Business Account ID</strong> — shown at top of the page</> },
-        { num:3, title:'Register webhook', body: <>In WhatsApp → Configuration → Webhook, paste these values:<br/><br/>
-          <div style={{background:T.inputbg,border:`1px solid ${T.border}`,borderRadius:8,padding:'12px 14px',marginTop:8}}>
-            <p style={{margin:'0 0 6px',fontSize:11,color:T.textdim,fontFamily:MONO}}>CALLBACK URL</p>
-            <div style={{display:'flex',gap:8,alignItems:'center'}}>
-              <code style={{flex:1,fontSize:12,color:T.text,fontFamily:MONO,wordBreak:'break-all'}}>{WEBHOOK_URL}</code>
-              <button onClick={()=>copyText(WEBHOOK_URL,setWaCopied)}
-                style={{fontSize:11,padding:'4px 10px',background:T.golddim,border:`1px solid ${T.goldbrdr}`,borderRadius:6,color:T.gold,cursor:'pointer',fontFamily:MONO,flexShrink:0}}>
-                {waCopied?'Copied!':'Copy'}
-              </button>
-            </div>
-            <hr style={{border:'none',borderTop:`1px solid ${T.border}`,margin:'10px 0'}}/>
-            <p style={{margin:'0 0 4px',fontSize:11,color:T.textdim,fontFamily:MONO}}>VERIFY TOKEN</p>
-            <code style={{fontSize:12,color:T.text,fontFamily:MONO}}>{VERIFY_TOKEN}</code>
-          </div>
-          <p style={{margin:'10px 0 0',fontSize:12,color:T.textmd}}>Subscribe to the <strong style={{color:T.text}}>messages</strong> webhook field.</p>
-        </> },
-        { num:4, title:'Enter your credentials', body: (
-          <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            {(['phone_number_id','access_token','business_account_id'] as const).map(key=>(
-              <div key={key}>
-                <label style={{display:'block',fontSize:11,color:T.textdim,fontFamily:MONO,marginBottom:4,textTransform:'uppercase',letterSpacing:'0.08em'}}>{key.replace(/_/g,' ')}</label>
-                <input value={waFields[key]} onChange={e=>setWaFields(p=>({...p,[key]:e.target.value}))}
-                  placeholder={key==='phone_number_id'?'123456789012345':key==='access_token'?'EAAxxxxxx...':'987654321098765'}
-                  style={{width:'100%',padding:'9px 12px',background:T.inputbg,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,fontSize:13,fontFamily:MONO,outline:'none',boxSizing:'border-box'}}/>
-              </div>
-            ))}
-            <p style={{margin:'4px 0 0',fontSize:12,color:T.textmd}}>Add these to Vercel → Environment Variables, then redeploy.</p>
-          </div>
-        ) },
-      ]
-      const step = steps[waStep-1]
-      return (
-        <WizardOverlay>
-          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
-            <span style={{fontSize:28}}>📱</span>
-            <div>
-              <h2 style={{margin:0,fontSize:18,fontWeight:700,color:T.text}}>Connect WhatsApp Business</h2>
-              <p style={{margin:'2px 0 0',fontSize:12,color:T.textmd}}>Step {waStep} of {steps.length}</p>
-            </div>
-          </div>
-
-          <div style={{display:'flex',gap:6,marginBottom:24}}>
-            {steps.map(s=>(
-              <div key={s.num} style={{flex:1,height:3,borderRadius:2,background:waStep>=s.num?T.gold:T.border,transition:'background 0.2s'}}/>
-            ))}
-          </div>
-
-          <h3 style={{margin:'0 0 12px',fontSize:15,fontWeight:600,color:T.text}}>{step.num}. {step.title}</h3>
-          <div style={{fontSize:13,color:T.textmd,lineHeight:1.7}}>{step.body}</div>
-
-          <div style={{display:'flex',gap:10,marginTop:24,justifyContent:'flex-end'}}>
-            {waStep>1 && <button onClick={()=>setWaStep(s=>s-1)}
-              style={{padding:'8px 18px',background:'none',border:`1px solid ${T.border}`,borderRadius:8,color:T.textmd,cursor:'pointer',fontSize:13}}>Back</button>}
-            {waStep<steps.length
-              ? <button onClick={()=>setWaStep(s=>s+1)}
-                  style={{padding:'8px 20px',background:T.gold,border:'none',borderRadius:8,color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}>Next →</button>
-              : <button onClick={()=>{setWizard(null);setWaStep(1)}}
-                  style={{padding:'8px 20px',background:T.gold,border:'none',borderRadius:8,color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}>Done ✓</button>
-            }
-          </div>
-        </WizardOverlay>
-      )
-    }
-
-    function LinkedInWizard() {
-      return (
-        <WizardOverlay>
-          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
-            <span style={{fontSize:28}}>🔗</span>
-            <div>
-              <h2 style={{margin:0,fontSize:18,fontWeight:700,color:T.text}}>Connect LinkedIn</h2>
-              <p style={{margin:'2px 0 0',fontSize:12,color:T.textmd}}>One-click OAuth connection</p>
-            </div>
-          </div>
-
-          <div style={{background:T.inputbg,border:`1px solid ${T.border}`,borderRadius:10,padding:'16px 18px',marginBottom:20}}>
-            <p style={{margin:'0 0 8px',fontSize:13,fontWeight:600,color:T.text}}>Before connecting:</p>
-            <ol style={{margin:0,paddingLeft:18,fontSize:13,color:T.textmd,lineHeight:1.8}}>
-              <li>Go to <a href="https://www.linkedin.com/developers/apps/new" target="_blank" rel="noopener" style={{color:T.gold}}>LinkedIn Developer Apps</a> → Create app</li>
-              <li>Add products: <strong style={{color:T.text}}>Share on LinkedIn</strong> + <strong style={{color:T.text}}>Sign In with LinkedIn</strong></li>
-              <li>Set redirect URL to: <code style={{fontSize:11,fontFamily:MONO,color:T.gold}}>https://va.nexterai.agency/api/auth/linkedin/callback</code></li>
-              <li>Copy Client ID and Client Secret → add to Vercel env vars:<br/>
-                <code style={{fontSize:11,fontFamily:MONO,color:T.text}}>LINKEDIN_CLIENT_ID</code> and <code style={{fontSize:11,fontFamily:MONO,color:T.text}}>LINKEDIN_CLIENT_SECRET</code>
-              </li>
-            </ol>
-          </div>
-
-          <p style={{margin:'0 0 16px',fontSize:13,color:T.textmd}}>Once credentials are in Vercel, click below to authorize:</p>
-
-          <button onClick={()=>open('/api/auth/linkedin')}
-            style={{width:'100%',padding:'12px',background:'#0A66C2',border:'none',borderRadius:10,color:'#fff',fontSize:14,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-            <span style={{fontSize:18}}>🔗</span> Connect with LinkedIn
-          </button>
-
-          <p style={{margin:'12px 0 0',fontSize:11,color:T.textdim,textAlign:'center'}}>You'll be redirected to LinkedIn to approve access, then brought back with your access token.</p>
-        </WizardOverlay>
-      )
-    }
-
-    function handleConnect(c: typeof CONNECTIONS[0]) {
-      if (c.id === 'whatsapp') { setWizard('whatsapp'); setWaStep(1) }
-      else if (c.id === 'linkedin') { setWizard('linkedin') }
-      else open(c.addUrl)
-    }
-
-    return (
-      <div className="view-pad" style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
-        {wizard === 'whatsapp' && <WhatsAppWizard/>}
-        {wizard === 'linkedin' && <LinkedInWizard/>}
-
-        <div style={{marginBottom:28}}>
-          <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Connections</h1>
-          <p style={{margin:0,fontSize:14,color:T.textmd}}>Manage your integrations. Connect in under 30 seconds.</p>
-        </div>
-
-        <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Active · {connected.length} connected</p>
-        <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:24}}>
-          {connected.map(c=>(
-            <div key={c.id} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 20px',display:'flex',alignItems:'center',gap:14,boxShadow:T.shadowsm}}>
-              <span style={{fontSize:22,flexShrink:0}}>{c.icon}</span>
-              <div style={{flex:1,minWidth:0}}>
-                <p style={{margin:0,fontSize:14,fontWeight:600,color:T.text}}>{c.name}</p>
-                <p style={{margin:'2px 0 0',fontSize:12,color:T.textmd}}>{c.desc}</p>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
-                <div style={{width:6,height:6,borderRadius:'50%',background:T.green}}/>
-                <span style={{fontSize:11,color:T.green,fontFamily:MONO,fontWeight:600}}>Connected</span>
-                <button onClick={()=>open(c.manageUrl)}
-                  style={{fontSize:11,color:T.textdim,background:'none',border:`1px solid ${T.border}`,borderRadius:6,padding:'4px 10px',cursor:'pointer',fontFamily:MONO,transition:'all 0.12s'}}
-                  onMouseEnter={e=>{e.currentTarget.style.color=T.gold;e.currentTarget.style.borderColor=T.goldbrdr}}
-                  onMouseLeave={e=>{e.currentTarget.style.color=T.textdim;e.currentTarget.style.borderColor=T.border}}>
-                  Manage ↗
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Available — click to connect</p>
-        <div className="avail-grid" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
-          {available.map(c=>(
-            <div key={c.id} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 18px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',opacity:0.8,transition:'all 0.15s'}}
-              onClick={()=>handleConnect(c)}
-              onMouseEnter={e=>{e.currentTarget.style.opacity='1';e.currentTarget.style.borderColor=T.goldbrdr}}
-              onMouseLeave={e=>{e.currentTarget.style.opacity='0.8';e.currentTarget.style.borderColor=T.cardBord}}>
-              <span style={{fontSize:20,flexShrink:0}}>{c.icon}</span>
-              <div style={{flex:1,minWidth:0}}>
-                <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{c.name}</p>
-                <p style={{margin:'1px 0 0',fontSize:11,color:T.textmd,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.desc}</p>
-              </div>
-              <button onClick={e=>{e.stopPropagation();handleConnect(c)}}
-                style={{fontSize:11,color:T.gold,background:T.golddim,border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'5px 12px',cursor:'pointer',fontFamily:MONO,fontWeight:600,flexShrink:0}}>
-                + Connect
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Docs ──────────────────────────────────────────────────────────────────
-  function ViewDocs() {
-    const folders = ['Contracts', 'Proposals', 'Meeting Notes', 'Templates', 'Reports']
-    function handleDocFiles(files: FileList | null) {
-      if (!files) return
-      const names = Array.from(files).map(f => f.name)
-      setDocsUploadedFiles(p => [...p, ...names])
-    }
-    return (
-      <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 100px'}}>
-        <input ref={docsFileRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg" style={{display:'none'}} onChange={e=>handleDocFiles(e.target.files)}/>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:28,flexWrap:'wrap',gap:12}}>
-          <div>
-            <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Docs</h1>
-            <p style={{margin:0,fontSize:14,color:T.textmd}}>Upload documents and reference them in any AI conversation.</p>
-          </div>
-          <div style={{display:'flex',gap:8}}>
-            <button onClick={()=>window.open('https://drive.google.com','_blank','noopener')}
-              style={{background:'transparent',color:T.textmd,border:`1px solid ${T.border}`,borderRadius:8,padding:'9px 16px',cursor:'pointer',fontSize:13,fontWeight:600,transition:'all 0.12s'}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.color=T.text}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.textmd}}>
-              💾 Open Drive ↗
-            </button>
-            <button onClick={()=>docsFileRef.current?.click()}
-              style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 18px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>
-              + Upload
-            </button>
-          </div>
-        </div>
-        {docsUploadedFiles.length > 0 && (
-          <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:10,padding:'14px 18px',marginBottom:16,boxShadow:T.shadowsm}}>
-            <p style={{margin:'0 0 8px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Uploaded this session</p>
-            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-              {docsUploadedFiles.map((f,i)=>(
-                <span key={i} style={{fontSize:12,background:T.golddim,color:T.gold,border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'3px 10px',fontFamily:MONO}}>📄 {f}</span>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="docs-folders" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:24}}>
-          {folders.map(f=>(
-            <div key={f} onClick={()=>docsFileRef.current?.click()}
-              style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'18px',cursor:'pointer',transition:'all 0.15s',boxShadow:T.shadowsm}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.transform='translateY(-2px)'}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=T.cardBord;e.currentTarget.style.transform='translateY(0)'}}>
-              <span style={{fontSize:28,display:'block',marginBottom:8}}>📁</span>
-              <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{f}</p>
-              <p style={{margin:'3px 0 0',fontSize:11,color:T.textdim}}>0 documents · click to upload</p>
-            </div>
-          ))}
-        </div>
-        <div
-          onDragOver={e=>e.preventDefault()}
-          onDrop={e=>{e.preventDefault();handleDocFiles(e.dataTransfer.files)}}
-          style={{background:T.card,border:`2px dashed ${T.border}`,borderRadius:12,padding:'40px',textAlign:'center',cursor:'pointer',transition:'border-color 0.15s'}}
-          onMouseEnter={e=>e.currentTarget.style.borderColor=T.goldbrdr}
-          onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-          <span style={{fontSize:36,display:'block',marginBottom:12}}>☁️</span>
-          <p style={{margin:'0 0 6px',fontSize:15,fontWeight:600,color:T.text}}>Drop files here or click to upload</p>
-          <p style={{margin:'0 0 16px',fontSize:13,color:T.textmd}}>PDF, Word, Excel, images · Max 25MB per file</p>
-          <button onClick={()=>docsFileRef.current?.click()}
-            style={{background:T.gold,color:'#fff',border:'none',borderRadius:8,padding:'9px 20px',cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:`0 2px 8px ${T.goldglo}`}}>
-            Choose files
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Done For You ──────────────────────────────────────────────────────────
-  function ViewDone() {
-    const cats = ['All','Email','CRM','Calendar','AI']
-    const filter = doneFilter; const setFilter = setDoneFilter
-    const filtered = filter==='All' ? DONE_LOG : DONE_LOG.filter(d=>d.cat===filter)
-    const catColors: Record<string,{bg:string;color:string}> = {
-      Email:   {bg:`${T.blue}18`,    color:T.blue   },
-      CRM:     {bg:`${T.orange}18`,  color:T.orange },
-      Calendar:{bg:`${T.green}18`,   color:T.green  },
-      AI:      {bg:`${T.gold}18`,    color:T.gold   },
-    }
-    return (
-      <div style={{maxWidth:840,width:'100%',margin:'0 auto',padding:'32px 28px 100px'}}>
-        <div style={{marginBottom:24}}>
-          <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Done For You</h1>
-          <p style={{margin:0,fontSize:14,color:T.textmd}}>Everything your AI executed automatically — full audit trail.</p>
-        </div>
-        <div style={{display:'flex',gap:6,marginBottom:20,flexWrap:'wrap'}}>
-          {cats.map(c=>(
-            <button key={c} onClick={()=>setFilter(c)}
-              style={{fontSize:12,fontWeight:600,color:filter===c?T.gold:T.textmd,background:filter===c?T.golddim:'transparent',border:`1px solid ${filter===c?T.goldbrdr:T.border}`,borderRadius:999,padding:'5px 14px',cursor:'pointer',fontFamily:MONO,transition:'all 0.12s'}}>
-              {c}
-            </button>
-          ))}
-          <span style={{marginLeft:'auto',fontSize:12,color:T.textdim,fontFamily:MONO,alignSelf:'center'}}>{filtered.length} actions</span>
-        </div>
-        <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,overflow:'hidden',boxShadow:T.shadowsm}}>
-          {filtered.map((d,i)=>(
-            <div key={d.id} style={{display:'flex',alignItems:'center',gap:14,padding:'14px 20px',borderBottom:i<filtered.length-1?`1px solid ${T.divider}`:'none',transition:'background 0.1s'}}
-              onMouseEnter={e=>(e.currentTarget as HTMLDivElement).style.background=T.sideHov}
-              onMouseLeave={e=>(e.currentTarget as HTMLDivElement).style.background='transparent'}>
-              <div style={{width:36,height:36,borderRadius:9,background:catColors[d.cat]?.bg||T.golddim,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{d.icon}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{d.label}</p>
-                <p style={{margin:'2px 0 0',fontSize:12,color:T.textmd,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.detail}</p>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
-                <Badge label={d.cat} color={catColors[d.cat]?.color||T.gold} bg={catColors[d.cat]?.bg||T.golddim}/>
-                <span style={{fontSize:11,color:T.textdim,fontFamily:MONO,whiteSpace:'nowrap'}}>{d.time}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Feedback ──────────────────────────────────────────────────────────────
-  function ViewFeedback() {
-    const emojis = ['😞','😐','🙂','😊','🤩']
-    const rating = feedbackRating; const setRating = setFeedbackRating
-    function sendFeedback() {
-      if (!feedbackText.trim()) return
-      const ratingLabel = rating >= 0 ? `Rating: ${emojis[rating]} (${rating+1}/5)\n\n` : ''
-      const subject = encodeURIComponent('VA App Feedback')
-      const body = encodeURIComponent(`${ratingLabel}${feedbackText}`)
-      window.location.href = `mailto:info@i-review.ai?subject=${subject}&body=${body}`
-      setFeedbackSent(true)
-    }
-    return (
-      <div className="view-pad" style={{maxWidth:600,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
-        <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Feedback</h1>
-        <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Help us improve VA App. Sent directly to info@i-review.ai.</p>
-        {feedbackSent ? (
-          <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'48px',textAlign:'center',boxShadow:T.shadowsm}}>
-            <span style={{fontSize:40,display:'block',marginBottom:12}}>🙏</span>
-            <p style={{margin:'0 0 6px',fontSize:16,fontWeight:700,color:T.text}}>Thank you!</p>
-            <p style={{margin:'0 0 16px',fontSize:14,color:T.textmd}}>Your feedback is on its way to info@i-review.ai.</p>
-            <button onClick={()=>{setFeedbackSent(false);setFeedbackText('');setRating(-1)}}
-              style={{fontSize:13,color:T.gold,background:'none',border:`1px solid ${T.goldbrdr}`,borderRadius:8,padding:'8px 20px',cursor:'pointer'}}>
-              Send more feedback
-            </button>
-          </div>
-        ) : (
-          <div style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'24px',boxShadow:T.shadowsm}}>
-            <p style={{margin:'0 0 8px',fontSize:13,fontWeight:600,color:T.textmd}}>How would you rate your experience?</p>
-            <div style={{display:'flex',gap:8,marginBottom:20}}>
-              {emojis.map((e,i)=>(
-                <button key={i} onClick={()=>setRating(i)}
-                  style={{fontSize:24,background:rating===i?T.golddim:'none',border:`1px solid ${rating===i?T.goldbrdr:T.border}`,borderRadius:8,padding:'8px 14px',cursor:'pointer',transition:'all 0.12s',transform:rating===i?'scale(1.15)':'scale(1)'}}
-                  onMouseEnter={e2=>{if(rating!==i){e2.currentTarget.style.borderColor=T.goldbrdr;e2.currentTarget.style.background=T.golddim}}}
-                  onMouseLeave={e2=>{if(rating!==i){e2.currentTarget.style.borderColor=T.border;e2.currentTarget.style.background='none'}}}>
-                  {e}
-                </button>
-              ))}
-            </div>
-            <p style={{margin:'0 0 6px',fontSize:13,fontWeight:600,color:T.textmd}}>What&apos;s on your mind?</p>
-            <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} placeholder="Feature request, bug report, or general thoughts…"
-              style={{width:'100%',background:T.inputbg,border:`1px solid ${T.bordmd}`,borderRadius:8,padding:'12px 14px',fontSize:14,color:T.text,fontFamily:FONT,outline:'none',resize:'vertical',minHeight:100,marginBottom:14,boxSizing:'border-box'}}/>
-            <button onClick={sendFeedback} disabled={!feedbackText.trim()}
-              style={{background:feedbackText.trim()?T.gold:'transparent',color:feedbackText.trim()?'#fff':T.textdim,border:`1px solid ${feedbackText.trim()?T.gold:T.border}`,borderRadius:8,padding:'10px 24px',cursor:feedbackText.trim()?'pointer':'not-allowed',fontSize:14,fontWeight:600,boxShadow:feedbackText.trim()?`0 2px 8px ${T.goldglo}`:'none',transition:'all 0.15s'}}>
-              Send Feedback → info@i-review.ai
-            </button>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ─── Support ───────────────────────────────────────────────────────────────
-  function ViewSupport() {
-    const activeGuide = supportGuide; const setActiveGuide = setSupportGuide
-
-    const setupSteps = [
-      {
-        id:'anthropic', icon:'🤖', title:'Step 1 — Get Your Claude API Key',
-        time:'5 min', required:true,
-        steps:[
-          'Go to console.anthropic.com and create an account',
-          'Click "Get API Keys" → Create new key → copy it',
-          'Send the key to your Nexter AI setup contact',
-          'This key is private — never share it publicly',
-          'You are billed directly by Anthropic based on usage',
-        ],
-        link:'https://console.anthropic.com',linkLabel:'Open Anthropic Console ↗',
-      },
-      {
-        id:'gmail', icon:'📧', title:'Step 2 — Connect Gmail',
-        time:'3 min', required:true,
-        steps:[
-          'In this app, go to Connections → click "Connect" next to Gmail',
-          'Sign in with your Google account and allow the requested permissions',
-          'The app needs: read emails, send emails, read calendar',
-          'Once connected, the green dot appears — the AI can now read and send email on your behalf',
-          'To disconnect at any time: Google Account → Security → Third-party access',
-        ],
-        link:'https://myaccount.google.com/permissions',linkLabel:'Manage Google Permissions ↗',
-      },
-      {
-        id:'outlook', icon:'💼', title:'Step 3 — Connect Microsoft Outlook (optional)',
-        time:'3 min', required:false,
-        steps:[
-          'In Connections → click "Connect" next to Microsoft Outlook',
-          'Sign in with your Microsoft 365 account',
-          'The app reads both your Outlook inbox and your Outlook Calendar',
-          'If you use both Gmail and Outlook, the AI checks both automatically',
-        ],
-        link:'https://myaccount.microsoft.com',linkLabel:'Manage Microsoft Permissions ↗',
-      },
-      {
-        id:'ghl', icon:'🏢', title:'Step 4 — Connect GHL CRM (optional)',
-        time:'5 min', required:false,
-        steps:[
-          'Log into your Go High Level account',
-          'Go to Settings → Integrations → Private Integrations',
-          'Create a new integration and copy the token (starts with pit-...)',
-          'Also copy your Location ID from Settings → Business Info',
-          'Send both to your Nexter AI setup contact to add to the system',
-        ],
-        link:'https://app.gohighlevel.com',linkLabel:'Open GHL ↗',
-      },
-      {
-        id:'zoom', icon:'📹', title:'Step 5 — Connect Zoom (optional)',
-        time:'5 min', required:false,
-        steps:[
-          'Go to marketplace.zoom.us → Build App → Server-to-Server OAuth',
-          'Create an app, copy Account ID, Client ID, and Client Secret',
-          'Enable scopes: meeting:write, meeting:read, cloud_recording:read',
-          'Send credentials to your Nexter AI setup contact',
-          'Once connected, the AI can create Zoom meetings and read recording summaries',
-        ],
-        link:'https://marketplace.zoom.us',linkLabel:'Open Zoom Marketplace ↗',
-      },
-      {
-        id:'calendly', icon:'📅', title:'Step 6 — Connect Calendly (optional)',
-        time:'2 min', required:false,
-        steps:[
-          'Log into Calendly → Integrations → API & Webhooks',
-          'Create a Personal Access Token and copy it',
-          'Send to your Nexter AI setup contact',
-          'The AI will sync booking contacts directly to your CRM',
-        ],
-        link:'https://calendly.com/integrations/api_webhooks',linkLabel:'Open Calendly API ↗',
-      },
-    ]
-
-    const faqs = [
-      { q:'How do I activate a workflow?',           a:'Go to Workflows → find the workflow → toggle the switch. It runs automatically from that point forward.' },
-      { q:'Can I use the AI in multiple languages?', a:'Yes. Just write in your preferred language — the AI responds in the same language.' },
-      { q:'Where are my conversations stored?',      a:'Conversations are stored securely in your own private database. No data is shared with other clients.' },
-      { q:'How do I get a morning briefing?',        a:'Ask: "Give me my morning briefing" or click Morning Brief in Dashboard Quick Actions. It pulls email, calendar, and leads together.' },
-      { q:'What does the AI cost me?',               a:'You pay Anthropic directly per message. Typical usage costs $5–30/month depending on volume. You control your own API key and budget.' },
-      { q:'Can I request custom workflows?',         a:'Yes. Contact info@i-review.ai describing what you need. Custom workflows are built and added to your instance.' },
-      { q:'How do I disconnect a service?',          a:'Go to the service settings (e.g. Google Account → Security → Third-party access) and remove the app. The connection will stop immediately.' },
-    ]
-
-    return (
-      <div className="view-pad" style={{maxWidth:780,width:'100%',margin:'0 auto',padding:'32px 28px 80px'}}>
-        <h1 style={{margin:'0 0 6px',fontSize:22,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Help Center</h1>
-        <p style={{margin:'0 0 28px',fontSize:14,color:T.textmd}}>Setup guides, FAQs, and how to reach us.</p>
-
-        {/* Contact cards */}
-        <div className="support-cards" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:32}}>
-          {[
-            {icon:'📧',label:'Email Support',    desc:'info@i-review.ai',        action:()=>{ window.location.href='mailto:info@i-review.ai?subject=VA App Support' }},
-            {icon:'💬',label:'WhatsApp',         desc:'Quick reply, usually same day', action:()=>window.open('https://wa.me/message/placeholder','_blank','noopener')},
-          ].map(item=>(
-            <button key={item.label} onClick={item.action}
-              style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:12,padding:'16px 18px',textAlign:'left',cursor:'pointer',boxShadow:T.shadowsm,transition:'all 0.15s',display:'flex',alignItems:'center',gap:14}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldbrdr;e.currentTarget.style.transform='translateY(-1px)'}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=T.cardBord;e.currentTarget.style.transform='translateY(0)'}}>
-              <span style={{fontSize:28}}>{item.icon}</span>
-              <div>
-                <p style={{margin:'0 0 2px',fontSize:13,fontWeight:600,color:T.text}}>{item.label}</p>
-                <p style={{margin:0,fontSize:12,color:T.textmd}}>{item.desc}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Setup Guide */}
-        <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Setup Guide — Connect Your Tools</p>
-        <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:28}}>
-          {setupSteps.map(step=>(
-            <div key={step.id} style={{background:T.card,border:`1px solid ${activeGuide===step.id?T.goldbrdr:T.cardBord}`,borderRadius:12,overflow:'hidden',boxShadow:T.shadowsm,transition:'all 0.15s'}}>
-              <button onClick={()=>setActiveGuide(activeGuide===step.id?null:step.id)}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:14,padding:'14px 18px',background:'none',border:'none',cursor:'pointer',textAlign:'left'}}>
-                <span style={{fontSize:20,flexShrink:0}}>{step.icon}</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>{step.title}</p>
-                  <p style={{margin:'2px 0 0',fontSize:11,color:T.textdim,fontFamily:MONO}}>~{step.time} · {step.required?'Recommended':'Optional'}</p>
-                </div>
-                <span style={{fontSize:16,color:T.textdim,transition:'transform 0.2s',transform:activeGuide===step.id?'rotate(180deg)':'rotate(0deg)',display:'inline-block'}}>›</span>
-              </button>
-              {activeGuide===step.id && (
-                <div style={{padding:'0 18px 16px',borderTop:`1px solid ${T.divider}`}}>
-                  <ol style={{margin:'12px 0 0',paddingLeft:20,display:'flex',flexDirection:'column',gap:8}}>
-                    {step.steps.map((s,i)=>(
-                      <li key={i} style={{fontSize:13,color:T.textmd,lineHeight:1.6}}>{s}</li>
-                    ))}
-                  </ol>
-                  <a href={step.link} target="_blank" rel="noopener noreferrer"
-                    style={{display:'inline-block',marginTop:12,fontSize:12,color:T.gold,fontWeight:600,fontFamily:MONO,textDecoration:'none',border:`1px solid ${T.goldbrdr}`,borderRadius:6,padding:'5px 12px',background:T.golddim}}>
-                    {step.linkLabel}
-                  </a>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* FAQ */}
-        <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:T.textdim,textTransform:'uppercase',letterSpacing:'0.1em',fontFamily:MONO}}>Frequently Asked Questions</p>
-        <div style={{display:'flex',flexDirection:'column',gap:6}}>
-          {faqs.map((f,i)=>(
-            <details key={i} style={{background:T.card,border:`1px solid ${T.cardBord}`,borderRadius:10,padding:'13px 16px',cursor:'pointer'}}>
-              <summary style={{fontSize:13,fontWeight:600,color:T.text,listStyle:'none',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                {f.q}<span style={{color:T.textdim,fontWeight:400,marginLeft:8}}>+</span>
-              </summary>
-              <p style={{margin:'10px 0 0',fontSize:13,color:T.textmd,lineHeight:1.65}}>{f.a}</p>
-            </details>
           ))}
         </div>
       </div>
@@ -1406,11 +1278,11 @@ export default function StudioPage() {
           {view === 'dashboard'   && <ViewDashboard/>}
           {view === 'workflows'   && <ViewWorkflows/>}
           {view === 'agents'      && <ViewAgents/>}
-          {view === 'connections' && <ViewConnections/>}
-          {view === 'docs'        && <ViewDocs/>}
-          {view === 'done'        && <ViewDone/>}
-          {view === 'feedback'    && <ViewFeedback/>}
-          {view === 'support'     && <ViewSupport/>}
+          {view === 'connections' && <ViewConnections T={T} connWizard={connWizard} setConnWizard={setConnWizard} connWaStep={connWaStep} setConnWaStep={setConnWaStep} connWaFields={connWaFields} setConnWaFields={setConnWaFields} connWaCopied={connWaCopied} setConnWaCopied={setConnWaCopied}/>}
+          {view === 'docs'        && <ViewDocs T={T} docsFileRef={docsFileRef} docsUploadedFiles={docsUploadedFiles} setDocsUploadedFiles={setDocsUploadedFiles}/>}
+          {view === 'done'        && <ViewDone T={T} doneFilter={doneFilter} setDoneFilter={setDoneFilter}/>}
+          {view === 'feedback'    && <ViewFeedback T={T} feedbackText={feedbackText} setFeedbackText={setFeedbackText} feedbackSent={feedbackSent} setFeedbackSent={setFeedbackSent} feedbackRating={feedbackRating} setFeedbackRating={setFeedbackRating}/>}
+          {view === 'support'     && <ViewSupport T={T} supportGuide={supportGuide} setSupportGuide={setSupportGuide}/>}
         </div>
       </div>
 
