@@ -1403,14 +1403,14 @@ export default function StudioPage() {
         {/* View content */}
         <div className={view!=='chat'?'view-scroll':''} style={{flex:1,overflowY:view==='chat'?'hidden':'auto',display:'flex',flexDirection:'column',background:T.bg}}>
           {view === 'chat'        && ViewChat()}
-          {view === 'dashboard'   && ViewDashboard()}
-          {view === 'workflows'   && ViewWorkflows()}
-          {view === 'agents'      && ViewAgents()}
-          {view === 'connections' && ViewConnections()}
-          {view === 'docs'        && ViewDocs()}
-          {view === 'done'        && ViewDone()}
-          {view === 'feedback'    && ViewFeedback()}
-          {view === 'support'     && ViewSupport()}
+          {view === 'dashboard'   && <ViewDashboard/>}
+          {view === 'workflows'   && <ViewWorkflows/>}
+          {view === 'agents'      && <ViewAgents/>}
+          {view === 'connections' && <ViewConnections/>}
+          {view === 'docs'        && <ViewDocs/>}
+          {view === 'done'        && <ViewDone/>}
+          {view === 'feedback'    && <ViewFeedback/>}
+          {view === 'support'     && <ViewSupport/>}
         </div>
       </div>
 
