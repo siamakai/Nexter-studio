@@ -22,11 +22,11 @@
     },
     {
       "path": "/api/cron/meet-transcripts",
-      "schedule": "0 18 * * *"
+      "schedule": "0 */2 * * *"
     },
     {
       "path": "/api/cron/post-meeting",
-      "schedule": "0 19 * * *"
+      "schedule": "30 */2 * * *"
     },
     {
       "path": "/api/cron/weekly-review",
