@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron/post-meeting",
-      "schedule": "0 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/weekly-review",
