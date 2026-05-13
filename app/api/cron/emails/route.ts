@@ -140,7 +140,7 @@ Return: {"category":"urgent|action-needed|fyi|no-action","reason":"one sentence 
       const myEmail = process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
       const raw = Buffer.from([
         `To: ${myEmail}`,
-        `Subject: 🚨 URGENT EMAIL: ${subject}`,
+        `Subject: =?utf-8?B?${Buffer.from(`🚨 URGENT EMAIL: ${subject}`).toString('base64')}?=`,
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',

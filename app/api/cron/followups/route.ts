@@ -197,7 +197,7 @@ export async function GET(req: NextRequest) {
       const summaryLines = logs.map(l => `  ${l}`).join('\n')
       const raw = Buffer.from([
         `To: ${process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'}`,
-        `Subject: 📬 ${drafted} Follow-Up Draft${drafted > 1 ? 's' : ''} Ready to Review`,
+        `Subject: =?utf-8?B?${Buffer.from(`📬 ${drafted} Follow-Up Draft${drafted > 1 ? 's' : ''} Ready to Review`).toString('base64')}?=`,
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',

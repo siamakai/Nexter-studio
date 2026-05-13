@@ -151,7 +151,7 @@ These must be specific, revenue or relationship-focused, and actionable on Monda
       const to = process.env.BRIEFING_EMAIL || process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
       const raw = Buffer.from([
         `To: ${to}`,
-        `Subject: 📊 Weekly Review — Week Ending ${weekEnding}`,
+        `Subject: =?utf-8?B?${Buffer.from(`📊 Weekly Review — Week Ending ${weekEnding}`).toString('base64')}?=`,
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',

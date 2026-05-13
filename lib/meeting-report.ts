@@ -304,9 +304,10 @@ export async function sendMeetingEmail(
   const auth = await getAuthedClient()
   const gmail = google.gmail({ version: 'v1', auth })
 
+  const encodedSubject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`
   const raw = Buffer.from([
     `To: ${TO}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodedSubject}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
     '',
@@ -350,9 +351,10 @@ export async function sendNoTranscriptAlert(
   </div>
 </div>`
 
+  const alertSubject = `=?utf-8?B?${Buffer.from(`⚠️ No Transcript Found — ${meetingTitle} (${meetingDate})`).toString('base64')}?=`
   const raw = Buffer.from([
     `To: ${TO}`,
-    `Subject: ⚠️ No Transcript Found — ${meetingTitle} (${meetingDate})`,
+    `Subject: ${alertSubject}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
     '',

@@ -247,7 +247,7 @@ FORMAT (plain text):
       const auth = await getAuthedClient()
       const gmail = google.gmail({ version: 'v1', auth })
       const to = process.env.BRIEFING_EMAIL || process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
-      const subject = `☀️ Morning Briefing — ${today}`
+      const subject = `=?utf-8?B?${Buffer.from(`☀️ Morning Briefing — ${today}`).toString('base64')}?=`
       const raw = Buffer.from(
         [`To: ${to}`, `Subject: ${subject}`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', '', briefing].join('\r\n')
       ).toString('base64url')

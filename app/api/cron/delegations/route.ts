@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     try {
       const raw = Buffer.from([
         `To: ${from}`,
-        `Subject: ⚠️ ${overdue.length} Overdue Delegation${overdue.length > 1 ? 's' : ''} Need Attention`,
+        `Subject: =?utf-8?B?${Buffer.from(`⚠️ ${overdue.length} Overdue Delegation${overdue.length > 1 ? 's' : ''} Need Attention`).toString('base64')}?=`,
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',

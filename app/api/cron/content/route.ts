@@ -61,7 +61,7 @@ Flag what needs attention and suggest one specific action.`,
       const to = process.env.BRIEFING_EMAIL || process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
       const raw = Buffer.from([
         `To: ${to}`,
-        `Subject: 📱 Content Pipeline — ${overdue.length} overdue, ${emptyNextWeek} empty slots`,
+        `Subject: =?utf-8?B?${Buffer.from(`📱 Content Pipeline — ${overdue.length} overdue, ${emptyNextWeek} empty slots`).toString('base64')}?=`,
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',

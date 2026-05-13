@@ -150,7 +150,7 @@ export async function GET(req: NextRequest) {
     try {
       const raw = Buffer.from([
         `To: ${process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'}`,
-        `Subject: 💼 ${drafted} Relationship Re-engagement Draft${drafted > 1 ? 's' : ''} Ready`,
+        `Subject: =?utf-8?B?${Buffer.from(`💼 ${drafted} Relationship Re-engagement Draft${drafted > 1 ? 's' : ''} Ready`).toString('base64')}?=`,
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',

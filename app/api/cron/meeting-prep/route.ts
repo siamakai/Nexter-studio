@@ -65,8 +65,12 @@ export async function GET(req: NextRequest) {
   const logs: string[] = []
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
+  // Skip buffer/placeholder/focus block calendar events
+  const SKIP_TITLE = /buffer|focus block|hold|placeholder|busy|ooo|out of office|no meeting/i
+
   for (const event of upcomingEvents) {
     const title = event.summary as string || 'Meeting'
+    if (SKIP_TITLE.test(title)) { logs.push(`⏭ Skipped (buffer/block): ${title}`); continue }
     const attendees = ((event.attendees as { email: string; self?: boolean }[]) || [])
       .filter(a => !a.self)
       .map(a => a.email)
