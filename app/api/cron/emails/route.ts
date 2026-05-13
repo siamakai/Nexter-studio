@@ -83,7 +83,7 @@ async function triageEmail(opts: {
 
   const res = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 600,
+    max_tokens: 800,
     messages: [{
       role: 'user',
       content: `Triage this email for Dr. Siamak Goudarzi, Founder of Nexter AI Group. Return ONLY valid JSON, no markdown.
@@ -92,12 +92,19 @@ FROM: ${from}
 SUBJECT: ${subject}
 BODY: ${body.slice(0, 800)}
 
-Return: {"category":"urgent|action-needed|fyi|no-action","reason":"one sentence why","draft_reply":"short reply if action-needed or urgent, else null"}
+Return: {"category":"urgent|action-needed|fyi|no-action","reason":"one sentence why","draft_reply":"full professional reply if action-needed or urgent, else null"}
 
-- urgent: needs response TODAY (client issue, time-sensitive deal, legal/financial)
+Rules for category:
+- urgent: needs response TODAY (client issue, time-sensitive deal, legal/financial, meeting today)
 - action-needed: needs a reply but not urgent (general inquiry, follow-up request)
 - fyi: informational, no reply needed
-- no-action: newsletter, notification, spam`,
+- no-action: newsletter, notification, spam
+
+Rules for draft_reply:
+- Write a complete, professional email body ready to send — NOT a short acknowledgment
+- Address the specific points raised in the email
+- Sign off as: "Best regards,\nSiamak Goudarzi\nFounder, Nexter AI Group"
+- 3–6 sentences, warm and direct`,
     }],
   })
 
@@ -144,7 +151,7 @@ Return: {"category":"urgent|action-needed|fyi|no-action","reason":"one sentence 
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',
-        `URGENT email requires your attention today.\n\nFrom: ${from}\nSubject: ${subject}\nReason: ${triage.reason}\n${triage.draft_reply ? `\nDraft reply saved to Gmail Drafts:\n${triage.draft_reply}` : ''}`,
+        `URGENT email requires your attention today.\n\nFrom: ${from}\nSubject: ${subject}\nReason: ${triage.reason}\n\n${triage.draft_reply ? '✅ A draft reply has been prepared and saved to your Gmail Drafts folder. Review and send it at: https://mail.google.com/#drafts' : 'No draft was generated for this email.'}`,
       ].join('\r\n')).toString('base64url')
       await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
     } catch { /* non-critical */ }
