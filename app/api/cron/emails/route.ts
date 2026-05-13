@@ -5,6 +5,74 @@ import { getAuthedClient } from '@/lib/google'
 import { getMsAccessToken } from '@/lib/microsoft'
 import { processLead } from '@/lib/lead-processor'
 
+// ── Gmail Label Manager ───────────────────────────────────────────────────────
+
+const LABEL_DEFINITIONS = [
+  { name: 'VA/🚨 Urgent',        color: { backgroundColor: '#fb4c2f', textColor: '#ffffff' } },
+  { name: 'VA/📋 Action Needed', color: { backgroundColor: '#ffad47', textColor: '#ffffff' } },
+  { name: 'VA/ℹ️ FYI',           color: { backgroundColor: '#4986e7', textColor: '#ffffff' } },
+  { name: 'VA/✅ No Action',      color: { backgroundColor: '#b9e4d0', textColor: '#000000' } },
+]
+
+// Cache label IDs for this invocation
+const labelCache: Record<string, string> = {}
+
+async function getOrCreateLabel(gmail: ReturnType<typeof google.gmail>, labelName: string): Promise<string | null> {
+  if (labelCache[labelName]) return labelCache[labelName]
+
+  try {
+    const { data } = await gmail.users.labels.list({ userId: 'me' })
+    const existing = (data.labels || []).find(l => l.name === labelName)
+    if (existing?.id) {
+      labelCache[labelName] = existing.id
+      return existing.id
+    }
+
+    // Create label
+    const def = LABEL_DEFINITIONS.find(d => d.name === labelName)
+    const { data: created } = await gmail.users.labels.create({
+      userId: 'me',
+      requestBody: {
+        name: labelName,
+        labelListVisibility: 'labelShow',
+        messageListVisibility: 'show',
+        ...(def ? { color: def.color } : {}),
+      },
+    })
+    if (created.id) {
+      labelCache[labelName] = created.id
+      return created.id
+    }
+  } catch { /* non-critical */ }
+  return null
+}
+
+async function applyLabel(
+  gmail: ReturnType<typeof google.gmail>,
+  messageId: string,
+  category: string,
+): Promise<void> {
+  const labelMap: Record<string, string> = {
+    'urgent':       'VA/🚨 Urgent',
+    'action-needed':'VA/📋 Action Needed',
+    'fyi':          'VA/ℹ️ FYI',
+    'no-action':    'VA/✅ No Action',
+  }
+  const labelName = labelMap[category]
+  if (!labelName) return
+
+  const labelId = await getOrCreateLabel(gmail, labelName)
+  if (!labelId) return
+
+  try {
+    await gmail.users.messages.modify({
+      userId: 'me',
+      id: messageId,
+      requestBody: { addLabelIds: [labelId] },
+    })
+  } catch { /* non-critical */ }
+}
+
 // ── Inbox Triage ─────────────────────────────────────────────────────────────
 
 async function triageEmail(opts: {
@@ -37,6 +105,9 @@ Return: {"category":"urgent|action-needed|fyi|no-action","reason":"one sentence 
   const match = raw.match(/\{[\s\S]*\}/)
   if (!match) return
   const triage: { category: string; reason: string; draft_reply: string | null } = JSON.parse(match[0])
+
+  // Apply Gmail label to every email regardless of category
+  await applyLabel(gmail, messageId, triage.category)
 
   if (triage.category === 'no-action' || triage.category === 'fyi') return
 
