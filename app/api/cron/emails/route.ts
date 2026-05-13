@@ -119,16 +119,17 @@ Rules for draft_reply:
   if (triage.category === 'no-action' || triage.category === 'fyi') return
 
   // Save draft reply to Gmail Drafts
+  let draftSaved = false
   if (triage.draft_reply) {
     try {
       const myEmail = process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
       const replySubject = subject.startsWith('Re:') ? subject : `Re: ${subject}`
+      // Note: threadId links the draft to the thread — no need for In-Reply-To/References
+      // (those require the RFC 2822 Message-ID header, not the Gmail API message ID)
       const rawEmail = [
         `From: ${myEmail}`,
         `To: ${from}`,
         `Subject: ${replySubject}`,
-        `In-Reply-To: ${messageId}`,
-        `References: ${messageId}`,
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',
@@ -138,7 +139,10 @@ Rules for draft_reply:
         userId: 'me',
         requestBody: { message: { raw: Buffer.from(rawEmail).toString('base64url'), threadId } },
       })
-    } catch { /* non-critical */ }
+      draftSaved = true
+    } catch (err) {
+      console.error('[triage] Draft creation failed:', err)
+    }
   }
 
   // For urgent: send an immediate alert
@@ -151,7 +155,7 @@ Rules for draft_reply:
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',
-        `URGENT email requires your attention today.\n\nFrom: ${from}\nSubject: ${subject}\nReason: ${triage.reason}\n\n${triage.draft_reply ? '✅ A draft reply has been prepared and saved to your Gmail Drafts folder. Review and send it at: https://mail.google.com/#drafts' : 'No draft was generated for this email.'}`,
+        `URGENT email requires your attention today.\n\nFrom: ${from}\nSubject: ${subject}\nReason: ${triage.reason}\n\n${draftSaved ? '✅ A draft reply has been prepared and saved to your Gmail Drafts folder. Review and send it at: https://mail.google.com/#drafts' : 'No draft was generated for this email.'}`,
       ].join('\r\n')).toString('base64url')
       await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
     } catch { /* non-critical */ }
@@ -236,8 +240,8 @@ async function processGmailAccount(accountEmail: string): Promise<string[]> {
       })
       logs.push(`[Gmail:${accountEmail}] ${result.message}`)
 
-      // Inbox triage — runs in parallel, non-blocking
-      triageEmail({
+      // Inbox triage — await so errors surface in logs
+      await triageEmail({
         from: `${fromName} <${fromEmail}>`,
         subject,
         body: body || '',
