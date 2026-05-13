@@ -337,11 +337,20 @@ async function processMeeting(
   let transcriptSource = ''
   let banner = ''
 
-  // ── Case 1: Zoom + host → webhook handles recording. Check if already done. ─
+  // ── Case 1: Zoom + host → webhook is primary. Fall back after 90 min if no report. ─
   if (meeting.platform === 'Zoom' && meeting.isSiamakHost) {
-    // The Zoom cloud recording webhook at /api/webhooks/zoom processes this fully.
-    // We just return a note so the cron log shows it was handled.
-    return `⏭ Zoom host meeting delegated to webhook: ${meeting.title}`
+    const minutesSinceEnd = (Date.now() - meeting.endAt.getTime()) / 60000
+    // Give the Zoom webhook 90 minutes to fire. If still no report, generate fallback.
+    if (minutesSinceEnd < 90) {
+      return `⏭ Zoom host — waiting for webhook (${Math.round(minutesSinceEnd)} min since meeting ended)`
+    }
+    // Webhook didn't fire in time — generate calendar-data summary as fallback
+    transcriptSource = 'calendar data (Zoom webhook did not fire — check zoom.us/recording for the recording)'
+    banner = `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.85rem;color:#856404;">
+      <strong>⚠️ Zoom Recording Not Received</strong> — You were the host but the recording webhook did not arrive within 90 minutes.
+      Check <a href="https://zoom.us/recording" style="color:#B8963E;font-weight:700;">zoom.us/recording</a> to confirm the recording exists.
+      This summary was generated from calendar data only.
+    </div>`
   }
 
   // ── Case 2: Google Meet + host → look for Drive transcript ────────────────
