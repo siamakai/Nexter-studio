@@ -165,6 +165,10 @@ async function processGmailAccount(accountEmail: string): Promise<string[]> {
     const auth = await getAuthedClient(accountEmail)
     const gmail = google.gmail({ version: 'v1', auth })
 
+    // Pre-load VA label IDs so we can skip already-triaged emails
+    await Promise.all(LABEL_DEFINITIONS.map(d => getOrCreateLabel(gmail, d.name)))
+    const vaLabelIds = new Set(Object.values(labelCache))
+
     // Emails received in the last 20 minutes (cron runs every 15 min, slight overlap is fine)
     const after = Math.floor((Date.now() - 20 * 60 * 1000) / 1000)
     const listRes = await gmail.users.messages.list({
@@ -187,6 +191,10 @@ async function processGmailAccount(accountEmail: string): Promise<string[]> {
 
       // Skip if it's from ourselves
       if (fromEmail.toLowerCase() === accountEmail.toLowerCase()) continue
+
+      // Skip if already triaged — has a VA label from a previous cron run
+      const existingLabels = full.data.labelIds || []
+      if (existingLabels.some(id => vaLabelIds.has(id))) continue
 
       // Extract body text
       let body = ''
