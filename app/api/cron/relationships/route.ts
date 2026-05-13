@@ -21,39 +21,75 @@ interface StaleContact {
 async function getStaleContacts(): Promise<StaleContact[]> {
   if (!process.env.GHL_API_KEY) return []
 
-  const res = await fetch(
-    `https://services.leadconnectorhq.com/contacts/?locationId=${process.env.GHL_LOCATION_ID}&limit=100&sortBy=dateUpdated&sortDirection=asc`,
-    { headers: { Authorization: `Bearer ${process.env.GHL_API_KEY}`, Version: '2021-07-28' } }
-  )
-  const data = await res.json()
   const now = Date.now()
   const stale: StaleContact[] = []
+  let startAfter: string | null = null
+  let page = 0
 
-  for (const c of data.contacts || []) {
-    if (!c.email) continue
-    const tags: string[] = c.tags || []
-    // Only track contacts we care about (had some engagement)
-    if (!tags.some((t: string) => ['hot', 'warm', 'client', 'prospect', 'lead'].includes(t.toLowerCase()))) continue
+  // Paginate through all GHL contacts (max 5 pages = 500 contacts)
+  while (page < 5) {
+    const url = new URL('https://services.leadconnectorhq.com/contacts/')
+    url.searchParams.set('locationId', process.env.GHL_LOCATION_ID || '')
+    url.searchParams.set('limit', '100')
+    url.searchParams.set('sortBy', 'dateUpdated')
+    url.searchParams.set('sortDirection', 'asc')
+    if (startAfter) url.searchParams.set('startAfter', startAfter)
 
-    const lastActivity = new Date((c.dateUpdated || c.dateAdded) as string).getTime()
-    const daysInactive = Math.floor((now - lastActivity) / 86400000)
-
-    if (daysInactive < 30) continue
-
-    const tier = daysInactive >= 90 ? '90' : daysInactive >= 60 ? '60' : '30'
-    stale.push({
-      id: c.id,
-      name: `${c.firstName || ''} ${c.lastName || ''}`.trim(),
-      email: c.email,
-      company: c.companyName || '',
-      tags,
-      daysInactive,
-      tier,
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${process.env.GHL_API_KEY}`, Version: '2021-07-28' },
     })
+    if (!res.ok) break
+    const data = await res.json()
+    const contacts = data.contacts || []
+    if (!contacts.length) break
+
+    for (const c of contacts) {
+      if (!c.email) continue
+      const tags: string[] = c.tags || []
+      if (!tags.some((t: string) => ['hot', 'warm', 'client', 'prospect', 'lead'].includes(t.toLowerCase()))) continue
+
+      // Use dateAdded as the base — dateUpdated resets when VA/system adds notes
+      const lastActivity = new Date((c.dateAdded || c.dateUpdated) as string).getTime()
+      const daysInactive = Math.floor((now - lastActivity) / 86400000)
+
+      if (daysInactive < 30) continue
+
+      const tier = daysInactive >= 90 ? '90' : daysInactive >= 60 ? '60' : '30'
+      stale.push({
+        id: c.id,
+        name: `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+        email: c.email,
+        company: c.companyName || '',
+        tags,
+        daysInactive,
+        tier,
+      })
+    }
+
+    if (contacts.length < 100) break
+    startAfter = contacts[contacts.length - 1]?.id
+    page++
   }
 
-  // Max 5 per run to avoid spam
-  return stale.sort((a, b) => b.daysInactive - a.daysInactive).slice(0, 5)
+  return stale.sort((a, b) => b.daysInactive - a.daysInactive)
+}
+
+// Check if we already have a draft for this email address created today
+async function alreadyDraftedToday(
+  gmail: ReturnType<typeof google.gmail>,
+  email: string,
+): Promise<boolean> {
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/')
+    const { data } = await gmail.users.messages.list({
+      userId: 'me',
+      q: `in:draft to:${email} after:${todayStr}`,
+      maxResults: 1,
+    })
+    return (data.messages?.length || 0) > 0
+  } catch {
+    return false
+  }
 }
 
 function getTierMessage(tier: '30' | '60' | '90', contact: StaleContact): string {
@@ -73,6 +109,12 @@ async function draftReEngagement(
   contact: StaleContact,
   anthropic: Anthropic
 ): Promise<boolean> {
+  // Skip if we already drafted for this person today
+  if (await alreadyDraftedToday(gmail, contact.email)) {
+    console.log(`[relationships] Skipping ${contact.name} — draft already created today`)
+    return false
+  }
+
   // Personalize with Claude if we have company context
   let body = getTierMessage(contact.tier, contact)
 
@@ -92,7 +134,6 @@ ${body}`,
     } catch { /* use template */ }
   }
 
-  const tierLabel = { '30': '30-Day Check-in', '60': '60-Day Value Offer', '90': '90-Day Re-engagement' }[contact.tier]
   const subject = contact.tier === '90'
     ? `Checking in — ${contact.name}`
     : `Quick note — ${contact.company || contact.name}`
@@ -113,7 +154,6 @@ ${body}`,
       userId: 'me',
       requestBody: { message: { raw: Buffer.from(rawEmail).toString('base64url') } },
     })
-    console.log(`[relationships] Draft created: ${tierLabel} for ${contact.name} (${contact.daysInactive}d inactive)`)
     return true
   } catch {
     return false
@@ -134,18 +174,23 @@ export async function GET(req: NextRequest) {
   const gmail = google.gmail({ version: 'v1', auth })
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
+  // Cap at 5 drafts per run to avoid overwhelming Drafts folder
+  const candidates = stale.slice(0, 5)
   let drafted = 0
   const logs: string[] = []
 
-  for (const contact of stale) {
+  for (const contact of candidates) {
     const ok = await draftReEngagement(gmail, contact, anthropic)
     if (ok) {
       drafted++
-      logs.push(`✓ ${contact.tier}-day draft: ${contact.name} <${contact.email}> (${contact.daysInactive}d inactive)`)
+      const tierLabel = { '30': '30-Day Check-in', '60': '60-Day Value Offer', '90': '90-Day Re-engagement' }[contact.tier]
+      logs.push(`✓ ${tierLabel}: ${contact.name} <${contact.email}> (${contact.daysInactive}d inactive)`)
+    } else {
+      logs.push(`⏭ Skipped (already drafted): ${contact.name}`)
     }
   }
 
-  // Notify
+  // Notify Siamak
   if (drafted > 0) {
     try {
       const raw = Buffer.from([
