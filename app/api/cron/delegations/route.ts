@@ -50,11 +50,29 @@ export async function GET(req: NextRequest) {
       logs.push('Overdue summary sent to Siamak')
     } catch { /* non-critical */ }
 
-    // Increment nudge count for each overdue item
+    // Send nudge email to each team member and increment nudge count
     for (const d of overdue) {
       const nudgeCount = (d.nudge_count || 0) + 1
       await updateDelegation(d.id!, { nudge_count: nudgeCount, status: 'overdue' })
       logs.push(`Nudge #${nudgeCount} logged for: ${d.task} → ${d.assigned_to}`)
+
+      // Only send nudge email if assigned_to looks like an email address
+      if (d.assigned_to && d.assigned_to.includes('@')) {
+        try {
+          const dueText = d.due_date ? `Due: ${d.due_date}` : 'No due date set'
+          const raw = Buffer.from([
+            `To: ${d.assigned_to}`,
+            `From: ${from}`,
+            `Subject: Reminder: "${d.task}"`,
+            'MIME-Version: 1.0',
+            'Content-Type: text/plain; charset=utf-8',
+            '',
+            `Hi,\n\nThis is a friendly reminder that the following task assigned to you is overdue:\n\n  Task: ${d.task}\n  ${dueText}\n  Reminder #${nudgeCount}\n\nPlease update the status or reach out if you need help.\n\nBest,\nSiamak Goudarzi\nNexter AI Group`,
+          ].join('\r\n')).toString('base64url')
+          await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+          logs.push(`📧 Nudge email sent to ${d.assigned_to}`)
+        } catch { logs.push(`⚠️ Could not send nudge to ${d.assigned_to}`) }
+      }
     }
   }
 
