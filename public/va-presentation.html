@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VA — Nexter AI Group · Your AI Executive Assistant</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#06080F; color:#EDE8E0; overflow:hidden; height:100vh; width:100vw; }
+
+  .deck { width:100vw; height:100vh; position:relative; }
+  .slide { position:absolute; inset:0; display:none; flex-direction:column; justify-content:center; align-items:center; padding:60px; opacity:0; transition:opacity 0.35s ease; }
+  .slide.active { display:flex; opacity:1; }
+
+  :root {
+    --gold: #B8963E;
+    --golddim: rgba(184,150,62,0.12);
+    --goldbrdr: rgba(184,150,62,0.3);
+    --card: #0F1220;
+    --cardbord: rgba(255,255,255,0.07);
+    --textmd: rgba(237,232,224,0.6);
+    --textdim: rgba(237,232,224,0.32);
+    --green: #22C55E;
+  }
+
+  .logomark { display:inline-flex; align-items:center; gap:12px; }
+  .logomark-text strong { font-size:18px; font-weight:800; color:#EDE8E0; letter-spacing:-0.02em; }
+  .logomark-text span { display:block; font-size:11px; color:var(--textdim); letter-spacing:0.08em; text-transform:uppercase; margin-top:1px; }
+
+  .tag { display:inline-block; background:var(--golddim); border:1px solid var(--goldbrdr); color:var(--gold); font-size:11px; font-weight:700; padding:4px 12px; border-radius:999px; letter-spacing:0.06em; text-transform:uppercase; }
+
+  h1.hero { font-size:clamp(34px,5vw,62px); font-weight:800; letter-spacing:-0.04em; line-height:1.05; color:#EDE8E0; }
+  h1.hero span { color:var(--gold); }
+  h2.title { font-size:clamp(22px,3vw,38px); font-weight:800; letter-spacing:-0.03em; color:#EDE8E0; margin-bottom:8px; }
+  h2.title span { color:var(--gold); }
+  .subtitle { font-size:clamp(14px,1.6vw,17px); color:var(--textmd); line-height:1.65; max-width:680px; text-align:center; }
+
+  .grid { display:grid; gap:14px; width:100%; max-width:920px; }
+  .grid-2 { grid-template-columns:repeat(2,1fr); }
+  .grid-3 { grid-template-columns:repeat(3,1fr); }
+  .card { background:var(--card); border:1px solid var(--cardbord); border-radius:14px; padding:20px 22px; }
+  .card-icon { font-size:26px; margin-bottom:8px; }
+  .card h3 { font-size:14px; font-weight:700; color:#EDE8E0; margin-bottom:5px; }
+  .card p { font-size:12px; color:var(--textmd); line-height:1.6; }
+  .card .badge { display:inline-block; margin-top:8px; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.25); color:var(--green); font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; letter-spacing:0.04em; }
+
+  .problem-list { list-style:none; display:flex; flex-direction:column; gap:12px; max-width:680px; width:100%; }
+  .problem-list li { display:flex; align-items:flex-start; gap:14px; background:var(--card); border:1px solid var(--cardbord); border-radius:12px; padding:14px 18px; font-size:14px; color:var(--textmd); line-height:1.5; }
+  .problem-list li .icon { font-size:20px; flex-shrink:0; margin-top:1px; }
+
+  .wf-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; width:100%; max-width:960px; }
+  .wf-card { background:var(--card); border:1px solid var(--cardbord); border-radius:12px; padding:14px 12px; text-align:center; }
+  .wf-card .wf-icon { font-size:22px; margin-bottom:6px; }
+  .wf-card h4 { font-size:11px; font-weight:700; color:#EDE8E0; margin-bottom:4px; line-height:1.3; }
+  .wf-card p { font-size:10px; color:var(--textdim); line-height:1.4; }
+  .wf-num { display:inline-block; width:18px; height:18px; border-radius:50%; background:var(--golddim); border:1px solid var(--goldbrdr); color:var(--gold); font-size:9px; font-weight:800; line-height:18px; text-align:center; margin-bottom:6px; }
+
+  .section-layout { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start; width:100%; max-width:960px; }
+  .section-info h2 { font-size:26px; font-weight:800; color:#EDE8E0; letter-spacing:-0.03em; margin-bottom:10px; }
+  .section-info h2 span { color:var(--gold); }
+  .section-info p { font-size:13px; color:var(--textmd); line-height:1.7; margin-bottom:14px; }
+  .feature-list { list-style:none; display:flex; flex-direction:column; gap:8px; }
+  .feature-list li { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--textmd); }
+  .feature-list li::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--gold); flex-shrink:0; }
+
+  .compare-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; width:100%; max-width:820px; }
+  .compare-card { background:var(--card); border:1px solid var(--cardbord); border-radius:14px; padding:24px; }
+  .compare-card.bad { border-color:rgba(239,68,68,0.25); }
+  .compare-card.good { border-color:var(--goldbrdr); }
+  .compare-label { font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:14px; }
+  .compare-label.bad { color:#EF4444; }
+  .compare-label.good { color:var(--gold); }
+  .compare-list { list-style:none; display:flex; flex-direction:column; gap:8px; }
+  .compare-list li { display:flex; align-items:flex-start; gap:10px; font-size:13px; color:var(--textmd); line-height:1.4; }
+  .compare-list li .ci { font-size:14px; flex-shrink:0; }
+
+  .pill-row { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:700px; }
+  .pill { background:var(--golddim); border:1px solid var(--goldbrdr); color:var(--gold); border-radius:999px; padding:6px 14px; font-size:12px; font-weight:600; }
+
+  .divider { width:60px; height:2px; background:var(--gold); border-radius:1px; margin:16px auto; }
+  .accent-line { width:3px; height:48px; background:var(--gold); border-radius:2px; }
+
+  .cta-box { background:var(--card); border:1px solid var(--goldbrdr); border-radius:20px; padding:44px 52px; text-align:center; max-width:600px; width:100%; }
+  .cta-url { font-family:monospace; font-size:17px; color:var(--gold); font-weight:700; letter-spacing:0.02em; margin-top:10px; display:block; }
+
+  .stat-row { display:flex; gap:28px; justify-content:center; flex-wrap:wrap; }
+  .stat-box { text-align:center; background:var(--card); border:1px solid var(--cardbord); border-radius:14px; padding:22px 32px; }
+  .stat-box .stat-num { font-size:40px; font-weight:800; color:var(--gold); letter-spacing:-0.03em; }
+  .stat-box .stat-label { font-size:12px; color:var(--textmd); margin-top:4px; }
+
+  .nav { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:16px; background:rgba(12,14,24,0.9); border:1px solid var(--cardbord); border-radius:999px; padding:10px 20px; backdrop-filter:blur(12px); z-index:100; }
+  .nav button { background:none; border:none; color:var(--textmd); cursor:pointer; font-size:18px; padding:2px 8px; border-radius:6px; transition:color 0.15s; }
+  .nav button:hover { color:var(--gold); }
+  .nav-counter { font-size:12px; color:var(--textdim); font-family:monospace; min-width:44px; text-align:center; }
+  .nav-dots { display:flex; gap:5px; align-items:center; }
+  .nav-dot { width:5px; height:5px; border-radius:50%; background:var(--cardbord); cursor:pointer; transition:all 0.2s; border:none; }
+  .nav-dot.active { background:var(--gold); width:14px; border-radius:3px; }
+
+  .slide-logo { position:absolute; top:28px; left:40px; }
+  .slide-num { position:absolute; top:28px; right:40px; font-size:11px; color:var(--textdim); font-family:monospace; }
+
+  @media (max-width:700px) {
+    .slide { padding:24px 16px; }
+    .grid-3, .wf-grid, .compare-grid { grid-template-columns:1fr; }
+    .section-layout { grid-template-columns:1fr; gap:20px; }
+    h1.hero { font-size:26px; }
+    .wf-grid { grid-template-columns:repeat(2,1fr); }
+    .stat-row { gap:12px; }
+    .stat-box { padding:16px 20px; }
+    .stat-box .stat-num { font-size:28px; }
+    .cta-box { padding:28px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- ── SLIDE 1: Title ─────────────────────────────────────────────── -->
+  <div class="slide active" id="s1">
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:28px">
+      <div class="logomark">
+        <svg width="52" height="52" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+        <div class="logomark-text"><strong>VA</strong><span>Nexter AI Group</span></div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:20px">
+        <div class="accent-line"></div>
+        <h1 class="hero">Your Business<br/>on <span>Autopilot</span></h1>
+        <div class="accent-line"></div>
+      </div>
+
+      <p class="subtitle">10 AI workflows running 24/7 — so you focus on growth,<br/>not on managing tasks that should never reach your desk.</p>
+
+      <span class="tag">Built for Businesses · Fully Customizable · Always On</span>
+    </div>
+    <div class="slide-num">1 / 9</div>
+  </div>
+
+  <!-- ── SLIDE 2: The Problem ────────────────────────────────────────── -->
+  <div class="slide" id="s2">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:28px">
+      <span class="tag">The Problem</span>
+      <h2 class="title" style="margin-top:14px">You're paying <span>executive hours</span><br/>for administrative work</h2>
+    </div>
+    <ul class="problem-list">
+      <li><span class="icon">⏳</span>2–4 hours per day lost to emails, CRM updates, meeting notes, and follow-ups — none of which grows your business</li>
+      <li><span class="icon">🔥</span>Leads go cold while you're in meetings. Every hour of delay costs you conversion rate</li>
+      <li><span class="icon">🤯</span>Switching between 6+ tools (Gmail, CRM, Calendar, Zoom, WhatsApp…) breaks focus and creates missed tasks</li>
+      <li><span class="icon">💸</span>You considered hiring a VA — but a human costs €2,000+/month and still needs managing</li>
+    </ul>
+    <div class="slide-num">2 / 9</div>
+  </div>
+
+  <!-- ── SLIDE 3: The Solution ───────────────────────────────────────── -->
+  <div class="slide" id="s3">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:28px">
+      <span class="tag">The Solution</span>
+      <h2 class="title" style="margin-top:14px">One AI assistant — <span>no technical skills</span> needed</h2>
+    </div>
+
+    <div class="compare-grid">
+      <div class="compare-card bad">
+        <div class="compare-label bad">❌ Using Raw AI (Claude, ChatGPT…)</div>
+        <ul class="compare-list">
+          <li><span class="ci">😩</span>Requires technical setup and coding knowledge</li>
+          <li><span class="ci">🔄</span>Doesn't connect to your real tools</li>
+          <li><span class="ci">📋</span>No memory — you explain context every time</li>
+          <li><span class="ci">⚠️</span>Manual — you must ask, it doesn't act</li>
+          <li><span class="ci">🚫</span>No automations, no scheduled tasks</li>
+        </ul>
+      </div>
+      <div class="compare-card good">
+        <div class="compare-label good">✅ Nexter AI VA</div>
+        <ul class="compare-list">
+          <li><span class="ci">💬</span>Just talk in plain language — zero tech required</li>
+          <li><span class="ci">🔌</span>Connected to Gmail, CRM, Zoom, Calendar & more</li>
+          <li><span class="ci">🧠</span>Remembers your business, clients, and priorities</li>
+          <li><span class="ci">⚡</span>Takes real actions — sends emails, logs notes, books meetings</li>
+          <li><span class="ci">🤖</span>10 automations run every day without you asking</li>
+        </ul>
+      </div>
+    </div>
+    <div class="slide-num">3 / 9</div>
+  </div>
+
+  <!-- ── SLIDE 4: All 10 Workflows ──────────────────────────────────── -->
+  <div class="slide" id="s4">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:22px">
+      <span class="tag">10 Workflows · All Running Automatically</span>
+      <h2 class="title" style="margin-top:12px">Everything your business needs — <span>handled daily</span></h2>
+    </div>
+
+    <div class="wf-grid">
+      <div class="wf-card">
+        <div class="wf-num">1</div>
+        <div class="wf-icon">☀️</div>
+        <h4>Morning Briefing</h4>
+        <p>Daily digest of emails, tasks & calendar sent to you at 6am</p>
+      </div>
+      <div class="wf-card">
+        <div class="wf-num">2</div>
+        <div class="wf-icon">📅</div>
+        <h4>Meeting Prep</h4>
+        <p>AI brief on every meeting — who, context, what to know</p>
+      </div>
+      <div class="wf-card">
+        <div class="wf-num">3</div>
+        <div class="wf-icon">📧</div>
+        <h4>Email Manager</h4>
+        <p>Scans inbox, flags urgents, drafts replies, logs to CRM</p>
+      </div>
+      <div class="wf-card">
+        <div class="wf-num">4</div>
+        <div class="wf-icon">🔥</div>
+        <h4>Lead Follow-Ups</h4>
+        <p>Identifies leads going cold and sends timely follow-ups</p>
+      </div>
+      <div class="wf-card">
+        <div class="wf-num">5</div>
+        <div class="wf-icon">🤝</div>
+        <h4>Relationship Builder</h4>
+        <p>Monitors key contacts, suggests reconnections & touchpoints</p>
+      </div>
+      <div class="wf-card">
+        <div class="wf-num">6</div>
+        <div class="wf-icon">🎥</div>
+        <h4>Google Meet Summary</h4>
+        <p>Auto-transcribes & summarises every Meet call, saves to Drive</p>
+      </div>
+      <div class="wf-card">
+        <div class="wf-num">7</div>
+        <div class="wf-icon">📽️</div>
+        <h4>Zoom Summary</h4>
+        <p>Zoom recordings processed instantly — summary + CRM note</p>
+      </div>
+      <div class="wf-card">
+        <div class="wf-num">8</div>
+        <div class="wf-icon">✅</div>
+        <h4>Post-Meeting Actions</h4>
+        <p>Extracts action items, assigns tasks, sends follow-up emails</p>
+      </div>
+      <div class="wf-card">
+        <div class="wf-num">9</div>
+        <div class="wf-icon">📊</div>
+        <h4>Weekly Review</h4>
+        <p>Every Friday — what happened, what's due, your week ahead</p>
+      </div>
+      <div class="wf-card">
+        <div class="wf-num">10</div>
+        <div class="wf-icon">📝</div>
+        <h4>Content & Delegation</h4>
+        <p>Drafts social content, tracks delegated tasks & deadlines</p>
+      </div>
+    </div>
+    <div class="slide-num">4 / 9</div>
+  </div>
+
+  <!-- ── SLIDE 5: How Simple It Is ─────────────────────────────────── -->
+  <div class="slide" id="s5">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:28px">
+      <span class="tag">Simplicity</span>
+      <h2 class="title" style="margin-top:14px">If you can <span>send a WhatsApp</span>,<br/>you can use VA</h2>
+    </div>
+
+    <div class="section-layout" style="align-items:center">
+      <div class="section-info">
+        <p>No manuals. No training sessions. No technical knowledge. Open the app, type what you need, and it handles the rest — or it's already done it automatically before you even wake up.</p>
+        <ul class="feature-list">
+          <li>Works on phone, tablet, and desktop</li>
+          <li>Responds in seconds to any request</li>
+          <li>10 workflows run automatically every day</li>
+          <li>New users productive from day one</li>
+          <li>No IT team needed — ever</li>
+        </ul>
+      </div>
+      <div>
+        <div style="background:var(--card);border:1px solid var(--cardbord);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:12px">
+          <div style="background:#1A1D2E;border-radius:10px;padding:14px 16px;font-size:13px;color:var(--textmd)">
+            💬 <em>"Show me my hot leads and send a follow-up to anyone I haven't contacted in 5 days"</em>
+          </div>
+          <div style="background:var(--golddim);border:1px solid var(--goldbrdr);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--textmd)">
+            🤖 Found 3 hot leads. Ahmed last contacted 7 days ago — follow-up sent. Sarah last contacted 6 days ago — follow-up sent. James just booked a call via Calendly. All notes added to CRM. ✅
+          </div>
+          <div style="background:#1A1D2E;border-radius:10px;padding:14px 16px;font-size:13px;color:var(--textmd)">
+            💬 <em>"What happened in my Zoom call this morning?"</em>
+          </div>
+          <div style="background:var(--golddim);border:1px solid var(--goldbrdr);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--textmd)">
+            🤖 Your 9am call with TechCorp lasted 42 min. Key outcome: they want a proposal by Friday. 2 action items logged. Summary saved to Drive. CRM updated. ✅
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-num">5 / 9</div>
+  </div>
+
+  <!-- ── SLIDE 6: Business Value / ROI ─────────────────────────────── -->
+  <div class="slide" id="s6">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:32px">
+      <span class="tag">Business Value</span>
+      <h2 class="title" style="margin-top:14px">Why every growing business <span>needs this</span></h2>
+    </div>
+
+    <div class="stat-row" style="margin-bottom:28px">
+      <div class="stat-box">
+        <div class="stat-num">3h</div>
+        <div class="stat-label">saved every day per user</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">10×</div>
+        <div class="stat-label">faster lead follow-up</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">0</div>
+        <div class="stat-label">missed meetings or notes</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">24/7</div>
+        <div class="stat-label">always working, never sick</div>
+      </div>
+    </div>
+
+    <div class="grid grid-3" style="max-width:820px">
+      <div class="card">
+        <div class="card-icon">💼</div>
+        <h3>For Business Owners</h3>
+        <p>Get your mornings back. Every decision lands on your desk with context — not raw data you need to process yourself.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📈</div>
+        <h3>For Sales Teams</h3>
+        <p>Never lose a lead to slow follow-up again. VA acts the moment a contact goes quiet — while you're in your next meeting.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🏢</div>
+        <h3>For Any Industry</h3>
+        <p>Law firms, clinics, agencies, hotels, consultancies — if you have clients and meetings, this was built for you.</p>
+      </div>
+    </div>
+    <div class="slide-num">6 / 9</div>
+  </div>
+
+  <!-- ── SLIDE 7: Customization ─────────────────────────────────────── -->
+  <div class="slide" id="s7">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:28px">
+      <span class="tag">Customization</span>
+      <h2 class="title" style="margin-top:14px">Built around <span>your</span> business —<br/>not a generic template</h2>
+    </div>
+
+    <div class="grid grid-2" style="max-width:860px">
+      <div class="card" style="border-color:var(--goldbrdr)">
+        <div class="card-icon">🎯</div>
+        <h3>Your Mission, Your Voice</h3>
+        <p>VA is configured with your business's name, brand tone, industry terminology, and communication style. Every email it sends sounds like you.</p>
+        <span class="badge">✓ Configured for you</span>
+      </div>
+      <div class="card" style="border-color:var(--goldbrdr)">
+        <div class="card-icon">🔧</div>
+        <h3>Your Workflows</h3>
+        <p>Don't need content creation? Add a contracts workflow instead. Need a client onboarding flow? We build it. You choose the 10 that matter most.</p>
+        <span class="badge">✓ Fully flexible</span>
+      </div>
+      <div class="card" style="border-color:var(--goldbrdr)">
+        <div class="card-icon">🔌</div>
+        <h3>Your Tools</h3>
+        <p>Already using HubSpot instead of GHL? A different calendar? We connect to what you have — you don't need to change anything.</p>
+        <span class="badge">✓ Integrates with your stack</span>
+      </div>
+      <div class="card" style="border-color:var(--goldbrdr)">
+        <div class="card-icon">🌍</div>
+        <h3>Any Language, Any Timezone</h3>
+        <p>Serve clients in Arabic, French, German, or Farsi. Set your timezone — automations run when they're supposed to, wherever you are.</p>
+        <span class="badge">✓ Multi-language ready</span>
+      </div>
+    </div>
+    <div class="slide-num">7 / 9</div>
+  </div>
+
+  <!-- ── SLIDE 8: Support & Reliability ────────────────────────────── -->
+  <div class="slide" id="s8">
+    <div class="slide-logo">
+      <svg width="28" height="28" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+    </div>
+    <div style="text-align:center;margin-bottom:28px">
+      <span class="tag">Support & Reliability</span>
+      <h2 class="title" style="margin-top:14px">We don't just <span>sell software</span> —<br/>we make sure it works</h2>
+    </div>
+
+    <div class="grid grid-3" style="max-width:860px;margin-bottom:24px">
+      <div class="card">
+        <div class="card-icon">🚀</div>
+        <h3>Dedicated Onboarding</h3>
+        <p>We set everything up for you. Connect your tools, configure your workflows, and go live — you don't touch a single setting.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛡️</div>
+        <h3>Ongoing Monitoring</h3>
+        <p>All 10 workflows are actively monitored. If something breaks or an API changes, we fix it — before you even notice.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📞</div>
+        <h3>Real Human Support</h3>
+        <p>You get a dedicated contact at Nexter AI. Want a new workflow? Need something changed? Message us — it gets done.</p>
+      </div>
+    </div>
+
+    <div class="pill-row">
+      <span class="pill">✅ All 10 workflows live & tested</span>
+      <span class="pill">🔒 Your data stays private</span>
+      <span class="pill">⚡ 99.9% uptime on Vercel Pro</span>
+      <span class="pill">🌐 Hosted on your own domain</span>
+      <span class="pill">🔄 New workflows added anytime</span>
+    </div>
+    <div class="slide-num">8 / 9</div>
+  </div>
+
+  <!-- ── SLIDE 9: CTA ────────────────────────────────────────────────── -->
+  <div class="slide" id="s9">
+    <div class="cta-box">
+      <div style="margin-bottom:20px">
+        <svg width="44" height="44" viewBox="0 0 84 84"><rect width="84" height="84" fill="#B8963E"/><rect x="7" y="7" width="70" height="70" fill="none" stroke="#fff" stroke-width="2"/><text x="42" y="66" font-family="Georgia,'Times New Roman',serif" font-size="52" font-weight="700" fill="#fff" text-anchor="middle">N</text></svg>
+      </div>
+      <span class="tag" style="margin-bottom:16px;display:inline-block">Start Today</span>
+      <h2 style="font-size:30px;font-weight:800;letter-spacing:-0.03em;color:#EDE8E0;margin-bottom:12px">
+        Ready to put your business<br/>on <span style="color:var(--gold)">autopilot</span>?
+      </h2>
+      <p style="font-size:14px;color:var(--textmd);line-height:1.7;margin-bottom:24px;max-width:440px;margin-left:auto;margin-right:auto">
+        We'll set up your VA, connect your tools, and configure all 10 workflows — custom-built for your business. You'll be live within days, not months.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+        <div style="font-size:13px;color:var(--textdim)">Live demo at</div>
+        <span class="cta-url">va.nexterai.agency</span>
+        <div style="margin-top:12px;font-size:13px;color:var(--textdim)">Contact</div>
+        <span style="font-size:15px;color:var(--gold);font-weight:700">info@nexterai.agency</span>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:80px;font-size:11px;color:var(--textdim);text-align:center">
+      Nexter AI Group · AI Automation for Forward-Thinking Businesses
+    </div>
+    <div class="slide-num">9 / 9</div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- Navigation -->
+<nav class="nav">
+  <button onclick="go(-1)" title="Previous">&#8592;</button>
+  <div class="nav-dots" id="dots"></div>
+  <span class="nav-counter" id="counter">1 / 9</span>
+  <button onclick="go(1)" title="Next">&#8594;</button>
+</nav>
+
+<script>
+  const TOTAL = 9
+  let cur = 1
+
+  const dotsEl = document.getElementById('dots')
+  const counterEl = document.getElementById('counter')
+
+  for (let i = 1; i <= TOTAL; i++) {
+    const b = document.createElement('button')
+    b.className = 'nav-dot' + (i === 1 ? ' active' : '')
+    b.onclick = () => goTo(i)
+    dotsEl.appendChild(b)
+  }
+
+  function goTo(n) {
+    document.getElementById('s' + cur).classList.remove('active')
+    dotsEl.children[cur - 1].classList.remove('active')
+    cur = Math.max(1, Math.min(TOTAL, n))
+    document.getElementById('s' + cur).classList.add('active')
+    dotsEl.children[cur - 1].classList.add('active')
+    counterEl.textContent = cur + ' / ' + TOTAL
+  }
+
+  function go(d) { goTo(cur + d) }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(1)
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') go(-1)
+  })
+
+  let startX = 0
+  document.addEventListener('touchstart', e => { startX = e.touches[0].clientX }, { passive: true })
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX
+    if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1)
+  })
+</script>
+
+</body>
+</html>

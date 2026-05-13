@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/meeting-prep",
-      "schedule": "0 5 * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/emails",
