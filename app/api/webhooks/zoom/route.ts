@@ -66,9 +66,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const event = payload.event as string
   const handled = ['recording.completed', 'recording.transcript_completed']
-  if (!handled.includes(payload.event as string)) {
+  if (!handled.includes(event)) {
     return NextResponse.json({ ok: true, skipped: true })
+  }
+
+  // If recording.completed fires AND a transcript file exists, skip it —
+  // recording.transcript_completed will fire next with the same data.
+  // This prevents creating two duplicate Drive files per meeting.
+  if (event === 'recording.completed') {
+    const obj = payload.payload as Record<string, unknown>
+    const meeting = obj?.object as Record<string, unknown>
+    const files = (meeting?.recording_files as Record<string, unknown>[]) || []
+    const hasTranscript = files.some(f =>
+      (f.file_type as string) === 'TRANSCRIPT' || (f.recording_type as string) === 'audio_transcript'
+    )
+    if (hasTranscript) {
+      return NextResponse.json({ ok: true, skipped: 'transcript_completed will handle' })
+    }
   }
 
   // Respond immediately — Zoom retries if we don't respond fast
