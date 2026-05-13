@@ -40,8 +40,8 @@ const SIAMAK_EMAILS = [
   'siamak.goudarzi@nexterlaw.com',
 ]
 
-// Look back 90 minutes with a 15-minute grace period (don't process meetings < 15 min ago)
-const LOOK_BACK_MS = 90 * 60 * 1000
+// Look back 4 hours — catches any meeting from earlier in the day. Dedup prevents duplicates.
+const LOOK_BACK_MS = 4 * 60 * 60 * 1000
 const GRACE_MS     = 15 * 60 * 1000
 
 const SKIP_TITLE = /buffer|focus block|hold|placeholder|busy|ooo|out of office|no meeting/i
@@ -340,8 +340,8 @@ async function processMeeting(
   // ── Case 1: Zoom + host → webhook is primary. Fall back after 90 min if no report. ─
   if (meeting.platform === 'Zoom' && meeting.isSiamakHost) {
     const minutesSinceEnd = (Date.now() - meeting.endAt.getTime()) / 60000
-    // Give the Zoom webhook 90 minutes to fire. If still no report, generate fallback.
-    if (minutesSinceEnd < 90) {
+    // Give the Zoom webhook 60 minutes to fire. If still no report, generate fallback.
+    if (minutesSinceEnd < 60) {
       return `⏭ Zoom host — waiting for webhook (${Math.round(minutesSinceEnd)} min since meeting ended)`
     }
     // Webhook didn't fire in time — generate calendar-data summary as fallback
