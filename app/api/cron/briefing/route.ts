@@ -11,38 +11,6 @@ function isAuthorized(req: NextRequest) {
 
 const TZ = 'Europe/Budapest'
 
-// ── Weather (Budapest, open-meteo — no API key required) ─────────────────────
-
-async function getWeather(): Promise<string> {
-  try {
-    const res = await fetch(
-      'https://api.open-meteo.com/v1/forecast' +
-      '?latitude=47.4979&longitude=19.0402' +
-      '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m' +
-      '&timezone=Europe%2FBudapest'
-    )
-    if (!res.ok) return ''
-    const data = await res.json()
-    const cur  = data.current || {}
-    const code: number = cur.weather_code ?? -1
-    const temp: number = Math.round(cur.temperature_2m ?? 0)
-    const feel: number = Math.round(cur.apparent_temperature ?? temp)
-    const wind: number = Math.round(cur.wind_speed_10m ?? 0)
-
-    const desc = code === 0 ? 'Clear sky'
-      : code <= 3  ? 'Partly cloudy'
-      : code <= 48 ? 'Foggy'
-      : code <= 67 ? 'Rainy'
-      : code <= 77 ? 'Snowy'
-      : code <= 82 ? 'Showers'
-      : 'Thunderstorm'
-
-    return `${desc} · ${temp}°C (feels ${feel}°C) · Wind ${wind} km/h`
-  } catch {
-    return ''
-  }
-}
-
 // ── Pipeline summary from GHL ─────────────────────────────────────────────────
 
 async function getPipelineSummary(): Promise<string> {
@@ -272,13 +240,12 @@ async function getOverdueFollowups(): Promise<string> {
 
 function buildBriefingHtml(opts: {
   today: string
-  weather: string
   oneThing: string
   briefingBody: string
   pipeline: string
   focusBlockCreated: boolean
 }): string {
-  const { today, weather, oneThing, briefingBody, pipeline, focusBlockCreated } = opts
+  const { today, oneThing, briefingBody, pipeline, focusBlockCreated } = opts
 
   const bodyHtml = briefingBody
     .split('\n')
@@ -303,7 +270,7 @@ function buildBriefingHtml(opts: {
   <!-- Header -->
   <div style="background:#0F2347;padding:18px 24px;border-radius:8px 8px 0 0;">
     <h2 style="color:#B8963E;margin:0;font-size:1.05rem;">☀️ Morning Briefing</h2>
-    <p style="color:rgba(255,255,255,0.6);margin:4px 0 0;font-size:0.78rem;font-family:monospace;">${today}${weather ? ` · ${weather}` : ''}</p>
+    <p style="color:rgba(255,255,255,0.6);margin:4px 0 0;font-size:0.78rem;font-family:monospace;">${today}</p>
     ${focusBlockCreated ? '<p style="color:#ffc107;margin:4px 0 0;font-size:0.75rem;font-family:monospace;">📅 Focus block auto-added to calendar</p>' : ''}
   </div>
 
@@ -339,7 +306,7 @@ function buildBriefingHtml(opts: {
 export async function GET(req: NextRequest) {
   if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const [meetingData, emails, hotLeads, overdue, openTasks, contentSummary, delegationSummary, pipeline, weather] = await Promise.all([
+  const [meetingData, emails, hotLeads, overdue, openTasks, contentSummary, delegationSummary, pipeline] = await Promise.all([
     getTodayMeetings(),
     getUrgentEmails(),
     getHotLeads(),
@@ -348,7 +315,6 @@ export async function GET(req: NextRequest) {
     getContentSummary(),
     getDelegationSummary(),
     getPipelineSummary(),
-    getWeather(),
   ])
 
   let focusBlockCreated = false
@@ -417,7 +383,7 @@ Start your response with the ONE THING line. No intro sentence before it.`,
   const oneThing  = oneThingLine.replace(/^ONE THING:\s*/i, '').trim() || 'Review your pipeline and follow up with the most overdue hot lead.'
   const briefingBody = briefingText.replace(oneThingLine, '').trim()
 
-  const html = buildBriefingHtml({ today, weather, oneThing, briefingBody, pipeline, focusBlockCreated })
+  const html = buildBriefingHtml({ today, oneThing, briefingBody, pipeline, focusBlockCreated })
 
   if (process.env.GOOGLE_REFRESH_TOKEN) {
     try {
