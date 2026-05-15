@@ -60,8 +60,8 @@ async function getGoogleMeetings(windowStart: Date, windowEnd: Date): Promise<Pr
       const isHost = SIAMAK_EMAILS.some(e => organizerEmail === e || organizerEmail.includes(e.split('@')[0]))
 
       const attendees = (ev.attendees || [])
-        .filter((a: { self?: boolean; email?: string }) => !a.self && !a.email?.includes('resource.calendar.google'))
-        .map((a: { email?: string }) => a.email || '')
+        .filter(a => !a.self && !a.email?.includes('resource.calendar.google'))
+        .map(a => a.email ?? '')
         .filter(Boolean)
 
       meetings.push({

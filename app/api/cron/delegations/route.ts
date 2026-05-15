@@ -32,10 +32,14 @@ export async function GET(req: NextRequest) {
     const gmail = google.gmail({ version: 'v1', auth })
     const from = process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'
 
+    const MAX_NUDGES = 3
+
     // Send nudge summary to Siamak
-    const overdueLines = overdue.map(d =>
-      `• ${d.task} — assigned to ${d.assigned_to} (due: ${d.due_date || 'no date'}, nudges sent: ${d.nudge_count || 0})`
-    ).join('\n')
+    const overdueLines = overdue.map(d => {
+      const nudges = d.nudge_count || 0
+      const flag = nudges >= MAX_NUDGES ? ' ⛔ MAX NUDGES REACHED — handle personally' : ''
+      return `• ${d.task} — assigned to ${d.assigned_to} (due: ${d.due_date || 'no date'}, nudges sent: ${nudges}${flag})`
+    }).join('\n')
 
     try {
       const raw = Buffer.from([
@@ -56,6 +60,12 @@ export async function GET(req: NextRequest) {
       await updateDelegation(d.id!, { nudge_count: nudgeCount, status: 'overdue' })
       logs.push(`Nudge #${nudgeCount} logged for: ${d.task} → ${d.assigned_to}`)
 
+      // Cap at MAX_NUDGES — after that, Siamak's summary email is enough; stop emailing the team member
+      if (nudgeCount > MAX_NUDGES) {
+        logs.push(`⛔ ${d.assigned_to} has hit ${MAX_NUDGES} nudges — no further emails sent, manual escalation needed`)
+        continue
+      }
+
       // Only send nudge email if assigned_to looks like an email address
       if (d.assigned_to && d.assigned_to.includes('@')) {
         try {
@@ -67,7 +77,7 @@ export async function GET(req: NextRequest) {
             'MIME-Version: 1.0',
             'Content-Type: text/plain; charset=utf-8',
             '',
-            `Hi,\n\nThis is a friendly reminder that the following task assigned to you is overdue:\n\n  Task: ${d.task}\n  ${dueText}\n  Reminder #${nudgeCount}\n\nPlease update the status or reach out if you need help.\n\nBest,\nSiamak Goudarzi\nNexter AI Group`,
+            `Hi,\n\nThis is a friendly reminder that the following task assigned to you is overdue:\n\n  Task: ${d.task}\n  ${dueText}\n  Reminder #${nudgeCount} of ${MAX_NUDGES}\n\nPlease update the status or reach out if you need help.\n\nBest,\nSiamak Goudarzi\nNexter AI Group`,
           ].join('\r\n')).toString('base64url')
           await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
           logs.push(`📧 Nudge email sent to ${d.assigned_to}`)
