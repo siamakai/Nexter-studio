@@ -166,11 +166,25 @@ async function getOverdueFollowups(): Promise<string> {
       const updated = new Date((c.dateUpdated || c.dateAdded) as string)
       const tags = (c.tags as string[]) || []
       return updated < cutoff && tags.some(t => ['hot', 'warm'].includes(t.toLowerCase()))
-    }).slice(0, 5)
+    })
+
     if (!stale.length) return '  All hot/warm leads are up to date ✓'
-    return stale.map((c: Record<string, unknown>) => {
-      const d = Math.floor((Date.now() - new Date((c.dateUpdated || c.dateAdded) as string).getTime()) / 86400000)
-      return `  ⚠️ ${c.firstName || ''} ${c.lastName || ''} | ${c.email || ''} — ${d} days no contact`
+
+    // Sort: hot first, then warm, then by days inactive (longest first)
+    const withMeta = stale.map((c: Record<string, unknown>) => {
+      const tags = ((c.tags as string[]) || []).map(t => t.toLowerCase())
+      const temp  = tags.includes('hot') ? 'hot' : 'warm'
+      const days  = Math.floor((Date.now() - new Date((c.dateUpdated || c.dateAdded) as string).getTime()) / 86400000)
+      return { c, temp, days }
+    }).sort((a: { temp: string; days: number }, b: { temp: string; days: number }) => {
+      if (a.temp !== b.temp) return a.temp === 'hot' ? -1 : 1
+      return b.days - a.days
+    }).slice(0, 6)
+
+    return withMeta.map(({ c, temp, days }: { c: Record<string, unknown>; temp: string; days: number }) => {
+      const icon   = temp === 'hot' ? '🔥 HOT' : '🌡️ WARM'
+      const urgent = days >= 7 ? ' ⚠️ URGENT' : ''
+      return `  ${icon}${urgent} — ${c.firstName || ''} ${c.lastName || ''} | ${c.email || ''} | ${days} days no contact`
     }).join('\n')
   } catch { return '  (CRM error)' }
 }

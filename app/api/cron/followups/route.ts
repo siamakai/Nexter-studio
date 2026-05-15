@@ -2,6 +2,10 @@
  * Smart Follow-Up Engine
  * Runs daily — scans Gmail AND Outlook sent emails for unanswered threads (3+ days),
  * drafts follow-ups with Claude, saves to Gmail Drafts + Outlook Drafts.
+ *
+ * Priority ranking: HOT contacts are drafted first and shown at the top.
+ * Escalation logic: if 3+ follow-ups already sent with no reply, stops drafting
+ *   and flags the contact as needing a different approach (call / archive).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -16,22 +20,33 @@ function isAuthorized(req: NextRequest) {
 
 const FOLLOW_UP_AFTER_DAYS = 3
 const LOOK_BACK_DAYS       = 14
+const MAX_FOLLOW_UPS       = 3   // after this many sent follow-ups with no reply → escalate
 
 interface SentEmail {
-  source:    'gmail' | 'outlook'
-  threadId:  string        // Gmail threadId or Outlook conversationId
-  messageId: string        // Gmail msgId or Outlook message id
-  to:        string
-  toName:    string
-  subject:   string
-  sentAt:    Date
-  snippet:   string
+  source:        'gmail' | 'outlook'
+  threadId:      string
+  messageId:     string
+  to:            string
+  toName:        string
+  subject:       string
+  sentAt:        Date
+  snippet:       string
+  temperature:   'hot' | 'warm' | 'cold' | 'unknown'
+  crmContext:    string
+  followUpCount: number  // how many times we already replied in this thread with no response
 }
+
+const TEMP_ORDER = { hot: 0, warm: 1, cold: 2, unknown: 3 }
 
 // ── CRM context ───────────────────────────────────────────────────────────────
 
-async function getGhlContext(email: string): Promise<string> {
-  if (!process.env.GHL_API_KEY) return ''
+interface GhlData {
+  context:     string
+  temperature: 'hot' | 'warm' | 'cold' | 'unknown'
+}
+
+async function getGhlData(email: string): Promise<GhlData> {
+  if (!process.env.GHL_API_KEY) return { context: '', temperature: 'unknown' }
   try {
     const res = await fetch(
       `https://services.leadconnectorhq.com/contacts/?locationId=${process.env.GHL_LOCATION_ID}&query=${encodeURIComponent(email)}&limit=1`,
@@ -39,14 +54,22 @@ async function getGhlContext(email: string): Promise<string> {
     )
     const data = await res.json()
     const c = data.contacts?.[0]
-    if (!c) return ''
-    return `${c.firstName || ''} ${c.lastName || ''} | ${c.companyName || ''} | Tags: ${(c.tags || []).join(', ')}`
-  } catch { return '' }
+    if (!c) return { context: '', temperature: 'unknown' }
+    const tags: string[] = (c.tags || []).map((t: string) => t.toLowerCase())
+    const temperature: GhlData['temperature'] = tags.includes('hot') ? 'hot'
+      : tags.includes('warm') ? 'warm'
+      : tags.includes('cold') ? 'cold'
+      : 'unknown'
+    return {
+      context: `${c.firstName || ''} ${c.lastName || ''} | ${c.companyName || ''} | Tags: ${tags.join(', ')}`,
+      temperature,
+    }
+  } catch { return { context: '', temperature: 'unknown' } }
 }
 
 // ── Claude follow-up body ─────────────────────────────────────────────────────
 
-async function generateFollowUpBody(email: SentEmail, crmContext: string): Promise<string> {
+async function generateFollowUpBody(email: SentEmail): Promise<string> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
   const daysAgo = Math.floor((Date.now() - email.sentAt.getTime()) / 86400000)
   const res = await anthropic.messages.create({
@@ -59,7 +82,8 @@ async function generateFollowUpBody(email: SentEmail, crmContext: string): Promi
 Original email sent ${daysAgo} days ago to: ${email.toName} <${email.to}>
 Subject: ${email.subject}
 Context: ${email.snippet}
-${crmContext ? `CRM notes: ${crmContext}` : ''}
+${email.crmContext ? `CRM notes: ${email.crmContext}` : ''}
+${email.temperature !== 'unknown' ? `Lead temperature: ${email.temperature.toUpperCase()}` : ''}
 
 Write ONLY the email body (no subject, no greeting header). Under 4 sentences. Warm, not pushy. Reference the original naturally. End with a soft call to action.`,
     }],
@@ -100,16 +124,35 @@ async function getUnansweredGmail(gmail: ReturnType<typeof google.gmail>): Promi
         userId: 'me', id: full.threadId!, format: 'metadata',
         metadataHeaders: ['From', 'Date'],
       })
-      const hasReply = (thread.messages || []).some(m => {
+
+      const threadMessages = thread.messages || []
+      let hasReply      = false
+      let followUpCount = 0
+
+      for (const m of threadMessages) {
         const from = (m.payload?.headers?.find(h => h.name?.toLowerCase() === 'from')?.value || '').toLowerCase()
-        const date  = new Date(parseInt(m.internalDate || '0'))
-        return !from.includes(myEmail) && date > sentAt
-      })
+        const date = new Date(parseInt(m.internalDate || '0'))
+        if (date <= sentAt) continue
+
+        if (from.includes(myEmail)) {
+          followUpCount++  // we sent another message after the original
+        } else {
+          hasReply = true  // they replied
+        }
+      }
 
       if (!hasReply) {
         const toEmail = to.match(/<(.+?)>/) ? to.match(/<(.+?)>/)![1] : to
         const toName  = to.replace(/<.+>/, '').trim().replace(/"/g, '') || toEmail
-        unanswered.push({ source: 'gmail', threadId: full.threadId!, messageId: msg.id!, to: toEmail, toName, subject, sentAt, snippet: full.snippet || '' })
+        const ghl = await getGhlData(toEmail)
+        unanswered.push({
+          source: 'gmail', threadId: full.threadId!, messageId: msg.id!,
+          to: toEmail, toName, subject, sentAt,
+          snippet: full.snippet || '',
+          temperature: ghl.temperature,
+          crmContext:  ghl.context,
+          followUpCount,
+        })
       }
     } catch { /* skip */ }
   }
@@ -163,16 +206,15 @@ async function getUnansweredOutlook(): Promise<SentEmail[]> {
     const unanswered: SentEmail[] = []
 
     for (const msg of (data.value || []).slice(0, 20)) {
-      const subject    = (msg.subject || '') as string
-      const toAddr     = msg.toRecipients?.[0]?.emailAddress?.address || ''
-      const toName     = msg.toRecipients?.[0]?.emailAddress?.name || toAddr
-      const sentAt     = new Date(msg.sentDateTime)
-      const convId     = msg.conversationId as string
+      const subject = (msg.subject || '') as string
+      const toAddr  = msg.toRecipients?.[0]?.emailAddress?.address || ''
+      const toName  = msg.toRecipients?.[0]?.emailAddress?.name || toAddr
+      const sentAt  = new Date(msg.sentDateTime)
+      const convId  = msg.conversationId as string
 
       if (subject.toLowerCase().startsWith('re:')) continue
       if (toAddr.includes('noreply') || toAddr.includes('no-reply')) continue
 
-      // Check conversation for any reply after our sent message
       const convRes = await fetch(
         `https://graph.microsoft.com/v1.0/me/messages` +
         `?$filter=conversationId eq '${convId}'` +
@@ -182,13 +224,23 @@ async function getUnansweredOutlook(): Promise<SentEmail[]> {
       if (!convRes.ok) continue
       const convData = await convRes.json()
 
-      const hasReply = (convData.value || []).some((m: Record<string, unknown>) => {
-        const fromAddr = (((m as Record<string, unknown>).from as Record<string, Record<string, string>>)?.emailAddress?.address || '').toLowerCase()
-        const date     = new Date(((m as Record<string, unknown>).receivedDateTime as string) || 0)
-        return fromAddr !== OUTLOOK_EMAIL.toLowerCase() && date > sentAt
-      })
+      let hasReply      = false
+      let followUpCount = 0
+
+      for (const m of (convData.value || [])) {
+        const fromAddr = ((m.from as Record<string, Record<string, string>>)?.emailAddress?.address || '').toLowerCase()
+        const date     = new Date((m.receivedDateTime as string) || 0)
+        if (date <= sentAt) continue
+
+        if (fromAddr === OUTLOOK_EMAIL.toLowerCase()) {
+          followUpCount++
+        } else {
+          hasReply = true
+        }
+      }
 
       if (!hasReply) {
+        const ghl = await getGhlData(toAddr)
         unanswered.push({
           source:    'outlook',
           threadId:  convId,
@@ -197,7 +249,10 @@ async function getUnansweredOutlook(): Promise<SentEmail[]> {
           toName,
           subject,
           sentAt,
-          snippet:   (msg.bodyPreview as string || '').slice(0, 200),
+          snippet:       (msg.bodyPreview as string || '').slice(0, 200),
+          temperature:   ghl.temperature,
+          crmContext:    ghl.context,
+          followUpCount,
         })
       }
     }
@@ -210,16 +265,12 @@ async function saveOutlookDraft(email: SentEmail, body: string): Promise<boolean
   if (!process.env.MS_REFRESH_TOKEN) return false
   try {
     const token = await getMsAccessToken('siamak.goudarzi@nexterlaw.com')
-
-    // Create reply draft on the original message
     const replyRes = await fetch(
       `https://graph.microsoft.com/v1.0/me/messages/${email.messageId}/createReply`,
       { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}' }
     )
     if (!replyRes.ok) return false
     const draft = await replyRes.json()
-
-    // Update draft body
     const fullBody = `Hi ${email.toName.split(' ')[0]},\n\n${body}\n\nBest regards,\nSiamak Goudarzi\nFounder, Nexter AI Group`
     const patchRes = await fetch(
       `https://graph.microsoft.com/v1.0/me/messages/${draft.id}`,
@@ -242,53 +293,91 @@ export async function GET(req: NextRequest) {
   const auth  = await getAuthedClient()
   const gmail = google.gmail({ version: 'v1', auth })
 
-  // Scan both inboxes in parallel
   const [gmailUnanswered, outlookUnanswered] = await Promise.all([
     getUnansweredGmail(gmail),
     getUnansweredOutlook(),
   ])
 
+  // Sort by priority: hot → warm → cold → unknown
   const allUnanswered = [...gmailUnanswered, ...outlookUnanswered]
+    .sort((a, b) => TEMP_ORDER[a.temperature] - TEMP_ORDER[b.temperature])
 
   if (!allUnanswered.length) {
     return NextResponse.json({ ok: true, message: 'No unanswered emails requiring follow-up', drafted: 0 })
   }
 
   const logs: string[] = []
+  const escalations: string[] = []
   let drafted = 0
 
   for (const email of allUnanswered) {
-    try {
-      const crmContext = await getGhlContext(email.to)
-      const body       = await generateFollowUpBody(email, crmContext)
+    // Escalation: 3+ follow-ups sent, no reply — stop drafting, flag instead
+    if (email.followUpCount >= MAX_FOLLOW_UPS) {
+      escalations.push(`⛔ ESCALATION — ${email.toName} <${email.to}> [${email.temperature.toUpperCase()}]: ${email.followUpCount} follow-ups sent, no reply. Consider calling or archiving.`)
+      continue
+    }
 
+    try {
+      const body  = await generateFollowUpBody(email)
       const saved = email.source === 'gmail'
         ? await saveGmailDraft(gmail, email, body)
         : await saveOutlookDraft(email, body)
 
       if (saved) {
         drafted++
-        logs.push(`✓ [${email.source.toUpperCase()}] Draft for ${email.toName} — "${email.subject}"`)
+        const tempIcon = { hot: '🔥', warm: '🌡️', cold: '❄️', unknown: '•' }[email.temperature]
+        logs.push(`✓ ${tempIcon} [${email.temperature.toUpperCase()}] [${email.source.toUpperCase()}] ${email.toName} — "${email.subject}" (${email.followUpCount} prior follow-up${email.followUpCount !== 1 ? 's' : ''})`)
       }
     } catch (err) {
       logs.push(`✗ Failed for ${email.to}: ${String(err)}`)
     }
   }
 
-  // Send summary email
-  if (drafted > 0) {
+  // Send summary email grouped by priority
+  if (drafted > 0 || escalations.length > 0) {
     try {
+      const hotLogs  = logs.filter(l => l.includes('[HOT]'))
+      const warmLogs = logs.filter(l => l.includes('[WARM]'))
+      const coldLogs = logs.filter(l => l.includes('[COLD]') || l.includes('[UNKNOWN]') || (!l.includes('[HOT]') && !l.includes('[WARM]') && !l.includes('[COLD]')))
+
+      const sections: string[] = []
+      if (escalations.length) {
+        sections.push(`⛔ ESCALATION NEEDED (${escalations.length} contacts — change approach)\n${escalations.map(e => `  ${e}`).join('\n')}`)
+      }
+      if (hotLogs.length)  sections.push(`🔥 HOT PRIORITY (${hotLogs.length})\n${hotLogs.map(l => `  ${l}`).join('\n')}`)
+      if (warmLogs.length) sections.push(`🌡️ WARM (${warmLogs.length})\n${warmLogs.map(l => `  ${l}`).join('\n')}`)
+      if (coldLogs.length) sections.push(`❄️ COLD / OTHER (${coldLogs.length})\n${coldLogs.map(l => `  ${l}`).join('\n')}`)
+
+      const body = [
+        `${drafted} follow-up draft${drafted !== 1 ? 's' : ''} created${escalations.length ? ` + ${escalations.length} escalation${escalations.length !== 1 ? 's' : ''} flagged` : ''}.`,
+        '',
+        sections.join('\n\n'),
+        '',
+        `Gmail drafts:   https://mail.google.com/#drafts`,
+        `Outlook drafts: https://outlook.office.com/mail/drafts`,
+        '',
+        '---',
+        'Nexter AI VA — Smart Follow-Up Engine',
+      ].join('\n')
+
       const raw = Buffer.from([
         `To: ${process.env.GOOGLE_ACCOUNT_EMAIL || 'info@i-review.ai'}`,
-        `Subject: =?utf-8?B?${Buffer.from(`📬 ${drafted} Follow-Up Draft${drafted > 1 ? 's' : ''} Ready to Review`).toString('base64')}?=`,
+        `Subject: =?utf-8?B?${Buffer.from(`📬 ${drafted} Follow-Up Draft${drafted !== 1 ? 's' : ''} Ready${escalations.length ? ` + ${escalations.length} Escalation${escalations.length !== 1 ? 's' : ''}` : ''}`).toString('base64')}?=`,
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',
-        `${drafted} follow-up email${drafted > 1 ? 's have' : ' has'} been drafted across Gmail and Outlook.\n\nGmail drafts: https://mail.google.com/#drafts\nOutlook drafts: https://outlook.office.com/mail/drafts\n\nDrafts created:\n${logs.map(l => `  ${l}`).join('\n')}\n\n---\nNexter AI VA — Smart Follow-Up Engine`,
+        body,
       ].join('\r\n')).toString('base64url')
       await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
     } catch { /* non-critical */ }
   }
 
-  return NextResponse.json({ ok: true, gmail: gmailUnanswered.length, outlook: outlookUnanswered.length, drafted, logs })
+  return NextResponse.json({
+    ok: true,
+    gmail: gmailUnanswered.length,
+    outlook: outlookUnanswered.length,
+    drafted,
+    escalations: escalations.length,
+    logs: [...escalations, ...logs],
+  })
 }
