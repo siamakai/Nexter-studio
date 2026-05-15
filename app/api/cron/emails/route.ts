@@ -162,6 +162,21 @@ Rules for draft_reply:
   }
 }
 
+// All email addresses that belong to Siamak / the VA system — never triage or draft to these
+const OWN_EMAILS = [
+  'info@i-review.ai',
+  'siamak.goudarzi@nexterlaw.com',
+  'siamak@nexterai.agency',
+  'va@nexterai.agency',
+].map(e => e.toLowerCase())
+
+function isOwnEmail(email: string): boolean {
+  const e = email.toLowerCase()
+  return OWN_EMAILS.includes(e) ||
+    e === (process.env.GOOGLE_ACCOUNT_EMAIL || '').toLowerCase() ||
+    e === (process.env.BRIEFING_EMAIL || '').toLowerCase()
+}
+
 // Vercel protects cron routes with CRON_SECRET header automatically
 function isAuthorized(req: NextRequest) {
   const auth = req.headers.get('authorization')
@@ -200,8 +215,8 @@ async function processGmailAccount(accountEmail: string): Promise<string[]> {
       const fromEmail = emailMatch[1]?.trim() || from.trim()
       const fromName = from.replace(/<.+>/, '').trim().replace(/"/g, '')
 
-      // Skip if it's from ourselves
-      if (fromEmail.toLowerCase() === accountEmail.toLowerCase()) continue
+      // Skip if it's from ourselves or any known system address
+      if (isOwnEmail(fromEmail)) continue
 
       // Skip if already triaged — has a VA label from a previous cron run
       const existingLabels = full.data.labelIds || []
@@ -277,7 +292,7 @@ async function processMicrosoftAccount(accountEmail: string): Promise<string[]> 
       const fromEmail = msg.from?.emailAddress?.address || ''
       const fromName = msg.from?.emailAddress?.name || ''
 
-      if (fromEmail.toLowerCase() === accountEmail.toLowerCase()) continue
+      if (isOwnEmail(fromEmail)) continue
 
       const body = (msg.body?.content || '')
         .replace(/<[^>]+>/g, ' ')

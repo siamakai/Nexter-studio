@@ -43,8 +43,14 @@ async function getStaleContacts(): Promise<StaleContact[]> {
     const contacts = data.contacts || []
     if (!contacts.length) break
 
+    const ownDomains = ['i-review.ai', 'nexterai.agency', 'nexterlaw.com']
+    const ownEmails  = ['info@i-review.ai', 'siamak.goudarzi@nexterlaw.com']
+
     for (const c of contacts) {
       if (!c.email) continue
+      // Never draft re-engagement emails to our own addresses
+      const email = (c.email as string).toLowerCase()
+      if (ownEmails.includes(email) || ownDomains.some(d => email.endsWith(`@${d}`))) continue
       const tags: string[] = c.tags || []
       if (!tags.some((t: string) => ['hot', 'warm', 'client', 'prospect', 'lead'].includes(t.toLowerCase()))) continue
 

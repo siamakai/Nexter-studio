@@ -244,9 +244,23 @@ async function upsertGHLContact(analysis: LeadAnalysis, input: LeadInput): Promi
   return `${action} GHL contact: ${analysis.first_name} ${analysis.last_name} (${analysis.email}) — ${analysis.contact_type.toUpperCase()} | ${analysis.temperature.toUpperCase()} | Stage: ${analysis.pipeline_stage || 'N/A'}`
 }
 
+// Email domains that belong to Siamak / the VA system — never add to CRM
+const OWN_DOMAINS = ['i-review.ai', 'nexterai.agency', 'nexterlaw.com']
+const OWN_EMAILS  = ['info@i-review.ai', 'siamak.goudarzi@nexterlaw.com']
+
+function isOwnEmail(email: string): boolean {
+  const e = email.toLowerCase()
+  return OWN_EMAILS.includes(e) || OWN_DOMAINS.some(d => e.endsWith(`@${d}`))
+}
+
 export async function processLead(input: LeadInput): Promise<{ success: boolean; message: string }> {
   if (!process.env.GHL_API_KEY || !process.env.GHL_LOCATION_ID) {
     return { success: true, message: 'CRM not configured — skipped' }
+  }
+
+  // Hard block — never create a CRM contact from our own addresses
+  if (isOwnEmail(input.from_email)) {
+    return { success: true, message: `Skipped (own address): ${input.from_email}` }
   }
 
   try {
