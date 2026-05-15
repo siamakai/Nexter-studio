@@ -1,16 +1,18 @@
 /**
  * Unified Post-Meeting Processor — runs every hour
  *
- * Checks Google Calendar + Outlook Calendar for meetings that ended
- * in the past 90 minutes, then handles every case:
+ * S1 — Zoom + host:     Zoom webhook at /api/webhooks/zoom is primary.
+ *                        Cron waits 60 min after meeting end; if no webhook report was
+ *                        sent yet, generates a calendar-data fallback with yellow banner.
  *
- *  Zoom   + host     → Zoom webhook at /api/webhooks/zoom handles recordings automatically.
- *                       Cron skips if webhook already sent a report; otherwise sends a
- *                       "recording processing" placeholder so Siamak isn't left waiting.
- *  Google Meet + host → Scans Drive for the transcript doc Google saves automatically.
- *                       If found: full summary from transcript → Drive → CRM → drafts.
- *                       If not found: summary from calendar data + reminder to enable transcription.
- *  Not host (any)    → Summary from calendar data → Drive → CRM → manual report request.
+ * S2 — Google Meet + host:  Calendar-data summary immediately → Drive → CRM → follow-up draft
+ *                             → email with BLUE banner "add your notes at va.nexterai.agency"
+ *
+ * S3 — Zoom + attendee:     Same as S2 (calendar data, blue banner).
+ *
+ * S4 — Google Meet + attendee: Same as S2 (calendar data, blue banner).
+ *
+ * Notes submitted later via VA → saved to Drive, no extra email.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -27,6 +29,8 @@ import {
   buildMeetingEmailHtml,
   sendMeetingEmail,
 } from '@/lib/meeting-report'
+
+export const maxDuration = 60
 
 function isAuthorized(req: NextRequest) {
   return req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`
@@ -49,18 +53,18 @@ const SKIP_TITLE = /buffer|focus block|hold|placeholder|busy|ooo|out of office|n
 // ── Shared meeting structure ──────────────────────────────────────────────────
 
 interface UnifiedMeeting {
-  title:       string
-  startAt:     Date
-  endAt:       Date
-  durationMin: number
-  platform:    'Zoom' | 'Google Meet' | 'Teams' | 'Unknown'
-  isSiamakHost: boolean
-  organizer:   string
-  attendees:   string[]           // external attendee emails
+  title:         string
+  startAt:       Date
+  endAt:         Date
+  durationMin:   number
+  platform:      'Zoom' | 'Google Meet' | 'Teams' | 'Unknown'
+  isSiamakHost:  boolean
+  organizer:     string
+  attendees:     string[]
   attendeeNames: string[]
-  meetLink:    string
-  source:      'google' | 'outlook'
-  calendarId?: string             // Google event id (for dedup key)
+  meetLink:      string
+  source:        'google' | 'outlook'
+  calendarId?:   string
 }
 
 // ── Google Calendar ───────────────────────────────────────────────────────────
@@ -68,9 +72,9 @@ interface UnifiedMeeting {
 async function getGoogleMeetings(): Promise<UnifiedMeeting[]> {
   if (!process.env.GOOGLE_REFRESH_TOKEN) return []
   try {
-    const auth  = await getAuthedClient()
-    const cal   = google.calendar({ version: 'v3', auth })
-    const now   = Date.now()
+    const auth = await getAuthedClient()
+    const cal  = google.calendar({ version: 'v3', auth })
+    const now  = Date.now()
 
     const { data } = await cal.events.list({
       calendarId: 'primary',
@@ -87,8 +91,8 @@ async function getGoogleMeetings(): Promise<UnifiedMeeting[]> {
       const title = ev.summary || 'Meeting'
       if (SKIP_TITLE.test(title)) continue
 
-      const startAt = new Date(ev.start?.dateTime || ev.start?.date || now)
-      const endAt   = new Date(ev.end?.dateTime   || ev.end?.date   || now)
+      const startAt     = new Date(ev.start?.dateTime || ev.start?.date || now)
+      const endAt       = new Date(ev.end?.dateTime   || ev.end?.date   || now)
       const durationMin = Math.round((endAt.getTime() - startAt.getTime()) / 60000)
       if (durationMin < 5) continue
 
@@ -97,26 +101,23 @@ async function getGoogleMeetings(): Promise<UnifiedMeeting[]> {
       const isZoom   = desc.includes('zoom.us') || location.includes('zoom.us')
       const isGMeet  = !!(ev.hangoutLink || ev.conferenceData)
       const platform = isZoom ? 'Zoom' : isGMeet ? 'Google Meet' : 'Unknown'
+      if (platform === 'Unknown') continue
 
-      if (platform === 'Unknown') continue  // skip non-video events
-
-      const organizerEmail  = (ev.organizer?.email || '').toLowerCase()
-      const isSiamakHost    = SIAMAK_EMAILS.some(e =>
+      const organizerEmail = (ev.organizer?.email || '').toLowerCase()
+      const isSiamakHost   = SIAMAK_EMAILS.some(e =>
         organizerEmail === e || organizerEmail.includes(e.split('@')[0])
       )
-      const organizer = ev.organizer?.displayName || ev.organizer?.email || 'Unknown'
-      const rawAttendees = (ev.attendees || []).filter(a => !a.self && !a.resource)
-      const attendees    = rawAttendees.map(a => a.email || '').filter(Boolean)
+      const organizer     = ev.organizer?.displayName || ev.organizer?.email || 'Unknown'
+      const rawAttendees  = (ev.attendees || []).filter(a => !a.self && !a.resource)
+      const attendees     = rawAttendees.map(a => a.email || '').filter(Boolean)
       const attendeeNames = rawAttendees.map(a => a.displayName || a.email || '').filter(Boolean)
-
-      const meetLink = ev.hangoutLink ||
-        (isZoom ? (desc.match(/https?:\/\/[^\s]*zoom\.us[^\s]*/)?.[0] || location) : '')
+      const meetLink      = ev.hangoutLink ||
+        (isZoom ? (desc.match(/https?:\/\/[^\s]*zoom\.us[^\s]*/)?.[0] || location) : '') || ''
 
       meetings.push({
         title, startAt, endAt, durationMin, platform,
         isSiamakHost, organizer, attendees, attendeeNames, meetLink,
-        source: 'google',
-        calendarId: ev.id || undefined,
+        source: 'google', calendarId: ev.id || undefined,
       })
     }
 
@@ -154,18 +155,17 @@ async function getOutlookMeetings(): Promise<UnifiedMeeting[]> {
       const title = (ev.subject || 'Meeting') as string
       if (SKIP_TITLE.test(title)) continue
 
-      const startAt = new Date(ev.start?.dateTime + 'Z')
-      const endAt   = new Date(ev.end?.dateTime + 'Z')
+      const startAt     = new Date(ev.start?.dateTime + 'Z')
+      const endAt       = new Date(ev.end?.dateTime + 'Z')
       const durationMin = Math.round((endAt.getTime() - startAt.getTime()) / 60000)
       if (durationMin < 5) continue
 
-      const joinUrl   = (ev.onlineMeeting?.joinUrl as string) || ''
-      const bodyPrev  = (ev.bodyPreview as string) || ''
-      const loc       = (ev.location?.displayName as string) || ''
-      const isZoom    = joinUrl.includes('zoom.us') || bodyPrev.includes('zoom.us') || loc.includes('zoom.us')
-      const isTeams   = joinUrl.includes('teams.microsoft.com') || joinUrl.includes('teams.live.com')
-      const platform  = isZoom ? 'Zoom' : isTeams ? 'Teams' : 'Unknown'
-
+      const joinUrl  = (ev.onlineMeeting?.joinUrl as string) || ''
+      const bodyPrev = (ev.bodyPreview as string) || ''
+      const loc      = (ev.location?.displayName as string) || ''
+      const isZoom   = joinUrl.includes('zoom.us') || bodyPrev.includes('zoom.us') || loc.includes('zoom.us')
+      const isMeet   = bodyPrev.includes('meet.google.com') || loc.includes('meet.google.com')
+      const platform = isZoom ? 'Zoom' : isMeet ? 'Google Meet' : 'Unknown'
       if (platform === 'Unknown') continue
 
       const organizerEmail = (ev.organizer?.emailAddress?.address as string || '').toLowerCase()
@@ -174,8 +174,8 @@ async function getOutlookMeetings(): Promise<UnifiedMeeting[]> {
       )
       const organizer = (ev.organizer?.emailAddress?.name as string) || organizerEmail
 
-      const rawAttendees = (ev.attendees || []) as Record<string, Record<string, string>>[]
-      const attendees    = rawAttendees
+      const rawAttendees  = (ev.attendees || []) as Record<string, Record<string, string>>[]
+      const attendees     = rawAttendees
         .map(a => (a.emailAddress?.address || '').toLowerCase())
         .filter(e => e && !SIAMAK_EMAILS.some(se => e === se))
       const attendeeNames = rawAttendees
@@ -185,9 +185,7 @@ async function getOutlookMeetings(): Promise<UnifiedMeeting[]> {
       meetings.push({
         title, startAt, endAt, durationMin, platform,
         isSiamakHost, organizer, attendees, attendeeNames,
-        meetLink: joinUrl,
-        source: 'outlook',
-        calendarId: undefined,
+        meetLink: joinUrl, source: 'outlook',
       })
     }
 
@@ -199,6 +197,7 @@ async function getOutlookMeetings(): Promise<UnifiedMeeting[]> {
 }
 
 // ── Deduplication ─────────────────────────────────────────────────────────────
+// Checks for both cron reports ("Meeting Report:") and webhook reports ("Zoom Summary:")
 
 async function getAlreadyProcessedToday(gmail: ReturnType<typeof google.gmail>): Promise<Set<string>> {
   const processed = new Set<string>()
@@ -206,7 +205,7 @@ async function getAlreadyProcessedToday(gmail: ReturnType<typeof google.gmail>):
     const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/')
     const { data } = await gmail.users.messages.list({
       userId: 'me',
-      q: `subject:"Meeting Report:" after:${todayStr}`,
+      q: `(subject:"Meeting Report:" OR subject:"Zoom Summary:") after:${todayStr}`,
       maxResults: 30,
     })
     for (const msg of data.messages || []) {
@@ -214,65 +213,16 @@ async function getAlreadyProcessedToday(gmail: ReturnType<typeof google.gmail>):
         userId: 'me', id: msg.id!, format: 'metadata', metadataHeaders: ['Subject'],
       })
       const subject = full.payload?.headers?.find(h => h.name === 'Subject')?.value || ''
-      // Extract title from subject "Meeting Report: <title> — YYYY-MM-DD"
-      const match = subject.match(/Meeting Report: (.+?) — /)
+      const match   = subject.match(/(?:Meeting Report:|Zoom Summary:)\s*(.+?)\s*(?:—|$)/)
       if (match) processed.add(match[1].toLowerCase().trim())
     }
   } catch { /* skip */ }
   return processed
 }
 
-// ── Google Drive transcript search ────────────────────────────────────────────
-
-async function findMeetTranscriptInDrive(
-  drive: ReturnType<typeof google.drive>,
-  meetingTitle: string,
-  startAt: Date,
-): Promise<string | null> {
-  try {
-    // Search window: from 10 min before meeting start to now
-    const since = new Date(startAt.getTime() - 10 * 60 * 1000).toISOString()
-    const q = [
-      `mimeType='application/vnd.google-apps.document'`,
-      `(name contains 'transcript' or name contains 'Transcript' or name contains 'Meet transcript')`,
-      `createdTime > '${since}'`,
-      `trashed=false`,
-    ].join(' and ')
-
-    const { data } = await drive.files.list({
-      q,
-      fields: 'files(id, name, createdTime)',
-      orderBy: 'createdTime desc',
-      pageSize: 5,
-    })
-
-    const files = data.files || []
-    if (!files.length) return null
-
-    // Prefer transcript whose name matches meeting title keywords
-    const keywords = meetingTitle.toLowerCase().split(/\s+/).filter(w => w.length > 3)
-    const best = files.find(f =>
-      keywords.some(kw => f.name?.toLowerCase().includes(kw))
-    ) || files[0]
-
-    const exportRes = await drive.files.export(
-      { fileId: best.id!, mimeType: 'text/plain' },
-      { responseType: 'text' }
-    )
-    const text = (exportRes.data as string).slice(0, 8000).trim()
-    return text || null
-  } catch {
-    return null
-  }
-}
-
 // ── Follow-up draft ───────────────────────────────────────────────────────────
 
-async function generateFollowUpDraft(
-  anthropic: Anthropic,
-  meeting: UnifiedMeeting,
-  summary: string,
-): Promise<string> {
+async function generateFollowUpDraft(anthropic: Anthropic, meeting: UnifiedMeeting, summary: string): Promise<string> {
   const res = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 400,
@@ -283,14 +233,12 @@ async function generateFollowUpDraft(
 Meeting: ${meeting.title}
 Date: ${meeting.startAt.toLocaleString('en-GB', { timeZone: TZ })}
 Duration: ${meeting.durationMin} minutes
-Role: ${meeting.isSiamakHost ? 'Host' : 'Attendee'}
-Platform: ${meeting.platform}
 Attendees: ${meeting.attendeeNames.join(', ') || meeting.attendees.join(', ') || 'Unknown'}
 
 Meeting summary:
 ${summary.slice(0, 600)}
 
-Write only the email body (no subject). 3–5 sentences max. Reference key outcomes or next steps. Warm and professional. Sign off as Siamak.`,
+Write only the email body (no subject). 3–5 sentences. Reference key outcomes or next steps. Warm and professional. Sign off as Siamak.`,
     }],
   })
   return (res.content[0] as { type: 'text'; text: string }).text.trim()
@@ -319,85 +267,31 @@ async function createFollowUpDraft(
   }
 }
 
-// ── Process a single meeting ──────────────────────────────────────────────────
+// ── Shared report builder ─────────────────────────────────────────────────────
 
-async function processMeeting(
+async function buildAndSendReport(
   meeting: UnifiedMeeting,
   gmail: ReturnType<typeof google.gmail>,
   drive: ReturnType<typeof google.drive>,
   anthropic: Anthropic,
+  bannerHtml: string,
+  transcriptSource: string,
+  datePrefix: string,
+  startFormatted: string,
 ): Promise<string> {
-  const datePrefix = meeting.startAt.toISOString().slice(0, 10)
-  const startFormatted = meeting.startAt.toLocaleString('en-GB', {
-    timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long',
-    year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-  })
-
-  let transcript: string | null = null
-  let transcriptSource = ''
-  let banner = ''
-
-  // ── Case 1: Zoom + host → webhook is primary. Fall back after 90 min if no report. ─
-  if (meeting.platform === 'Zoom' && meeting.isSiamakHost) {
-    const minutesSinceEnd = (Date.now() - meeting.endAt.getTime()) / 60000
-    // Give the Zoom webhook 60 minutes to fire. If still no report, generate fallback.
-    if (minutesSinceEnd < 60) {
-      return `⏭ Zoom host — waiting for webhook (${Math.round(minutesSinceEnd)} min since meeting ended)`
-    }
-    // Webhook didn't fire in time — generate calendar-data summary as fallback
-    transcriptSource = 'calendar data (Zoom webhook did not fire — check zoom.us/recording for the recording)'
-    banner = `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.85rem;color:#856404;">
-      <strong>⚠️ Zoom Recording Not Received</strong> — You were the host but the recording webhook did not arrive within 90 minutes.
-      Check <a href="https://zoom.us/recording" style="color:#B8963E;font-weight:700;">zoom.us/recording</a> to confirm the recording exists.
-      This summary was generated from calendar data only.
-    </div>`
-  }
-
-  // ── Case 2: Google Meet + host → look for Drive transcript ────────────────
-  if (meeting.platform === 'Google Meet' && meeting.isSiamakHost) {
-    transcript = await findMeetTranscriptInDrive(drive, meeting.title, meeting.startAt)
-    if (transcript) {
-      transcriptSource = 'Google Meet transcript (Drive)'
-      banner = `<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.85rem;color:#2e7d32;">
-        <strong>✅ Transcript Found</strong> — Summary generated from the Google Meet transcript saved to your Drive.
-      </div>`
-    } else {
-      transcriptSource = 'calendar data (no transcript found)'
-      banner = `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.85rem;color:#856404;">
-        <strong>⚠️ No Transcript Found</strong> — You were the host but no transcript was saved to Drive.
-        Next time, click <strong>Activities → Transcription → Start transcription</strong> at the start of the call.
-        Add your own notes at <a href="${APP_URL}" style="color:#B8963E;font-weight:700;">va.nexterai.agency</a>.
-      </div>`
-    }
-  }
-
-  // ── Case 3: Not host (Zoom, Google Meet, or Teams attendee) ──────────────
-  if (!meeting.isSiamakHost) {
-    const platformIcon = meeting.platform === 'Zoom' ? '🔵' : meeting.platform === 'Google Meet' ? '🟢' : '🟣'
-    banner = `<div style="background:#e3f2fd;border:1px solid #2196f3;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.85rem;color:#0d47a1;">
-      <strong>${platformIcon} ${meeting.platform} — Attendee</strong> — You were not the host so the meeting was not automatically recorded.
-      Summary below is based on calendar data only. To add your notes and enrich this report, go to
-      <a href="${APP_URL}" style="color:#B8963E;font-weight:700;">va.nexterai.agency</a> and paste your notes in the chat.
-    </div>`
-    transcriptSource = 'calendar data (attendee, not recorded)'
-  }
-
-  // ── Build context for summary ─────────────────────────────────────────────
-  const contextNote = transcript || [
+  const contextNote = [
     `Platform: ${meeting.platform}`,
-    `Role: ${meeting.isSiamakHost ? 'Host' : 'Attendee (meeting was not recorded)'}`,
+    `Role: ${meeting.isSiamakHost ? 'Host' : 'Attendee'}`,
     `Organised by: ${meeting.organizer}`,
     meeting.attendeeNames.length ? `Attendees: ${meeting.attendeeNames.join(', ')}` : '',
     `Duration: ${meeting.durationMin} minutes`,
-    `Source: ${transcriptSource}`,
+    `Note: ${transcriptSource}`,
   ].filter(Boolean).join('\n')
 
-  // ── Generate summary ──────────────────────────────────────────────────────
   const summary = await generateMeetingSummary(
     meeting.title, startFormatted, contextNote, meeting.durationMin
   )
 
-  // ── Save to Drive ─────────────────────────────────────────────────────────
   const fileContent = [
     `# ${meeting.title}`,
     `Date: ${startFormatted}`,
@@ -411,14 +305,12 @@ async function processMeeting(
     summary,
     '',
     '---',
-    transcript
-      ? '*Summary generated from transcript — Nexter AI VA*'
-      : '*Summary generated from calendar data only — add notes at va.nexterai.agency to enrich*',
+    '*Summary generated from calendar data — add your notes at va.nexterai.agency to enrich*',
   ].filter(l => l !== undefined).join('\n')
 
   const driveUrl = await saveMeetingToDrive(meeting.title, fileContent, datePrefix).catch(() => null)
 
-  // ── CRM update ────────────────────────────────────────────────────────────
+  // CRM update
   let contact = null
   for (const email of meeting.attendees) {
     contact = await findGhlContact(email).catch(() => null)
@@ -436,20 +328,20 @@ async function processMeeting(
     await autoTagContact(contact.id, summary, meeting.title).catch(() => null)
   }
 
-  // ── Follow-up draft ───────────────────────────────────────────────────────
+  // Follow-up draft
   let followUpCreated = false
   try {
     const followUpText = await generateFollowUpDraft(anthropic, meeting, summary)
     followUpCreated = await createFollowUpDraft(gmail, meeting, followUpText)
   } catch { /* non-fatal */ }
 
-  // ── Send briefing email ───────────────────────────────────────────────────
+  // Send briefing email
   const reportSubject = `Meeting Report: ${meeting.title} — ${datePrefix}`
   const html = buildMeetingEmailHtml({
     title: meeting.title,
     date: startFormatted,
     source: meeting.platform as 'Zoom' | 'Google Meet',
-    summary: banner + summary,
+    summary: bannerHtml + summary,
     driveUrl,
     contactName: contact?.name || null,
     durationMin: meeting.durationMin,
@@ -459,31 +351,74 @@ async function processMeeting(
   return `✓ ${meeting.title} | ${meeting.platform} | ${meeting.isSiamakHost ? 'host' : 'attendee'} | ${transcriptSource} | Drive: ${driveUrl ? 'saved' : 'failed'} | CRM: ${contact ? contact.name : 'not found'} | Follow-up: ${followUpCreated ? 'drafted' : 'skipped'}`
 }
 
+// ── Process a single meeting ──────────────────────────────────────────────────
+
+async function processMeeting(
+  meeting: UnifiedMeeting,
+  gmail: ReturnType<typeof google.gmail>,
+  drive: ReturnType<typeof google.drive>,
+  anthropic: Anthropic,
+): Promise<string> {
+  const datePrefix     = meeting.startAt.toISOString().slice(0, 10)
+  const startFormatted = meeting.startAt.toLocaleString('en-GB', {
+    timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long',
+    year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+  })
+
+  // ── S1: Zoom + host → webhook is primary; cron is 60-min fallback ─────────
+  if (meeting.platform === 'Zoom' && meeting.isSiamakHost) {
+    const minutesSinceEnd = (Date.now() - meeting.endAt.getTime()) / 60000
+    if (minutesSinceEnd < 60) {
+      return `⏭ Zoom host — waiting for webhook (${Math.round(minutesSinceEnd)} min since end)`
+    }
+    // Webhook didn't fire — generate calendar-data fallback with yellow warning
+    const banner = `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.85rem;color:#856404;">
+      <strong>⚠️ Zoom Recording Not Received</strong> — You were the host but the recording webhook did not arrive within 90 minutes.
+      Check <a href="https://zoom.us/recording" style="color:#B8963E;font-weight:700;">zoom.us/recording</a> to confirm the recording exists.
+      This summary was generated from calendar data only.
+    </div>`
+    return buildAndSendReport(meeting, gmail, drive, anthropic, banner, 'calendar data (Zoom webhook fallback)', datePrefix, startFormatted)
+  }
+
+  // ── S2 / S3 / S4: Google Meet host OR any attendee → immediate calendar-data + blue banner ──
+  const roleLabel  = meeting.isSiamakHost ? 'HOST' : 'ATTENDEE'
+  const icon       = meeting.platform === 'Google Meet' ? '🟢' : '🔵'
+  const banner = `<div style="background:#e3f2fd;border:1px solid #2196f3;border-radius:8px;padding:14px 18px;margin-bottom:16px;font-size:0.88rem;color:#0d47a1;line-height:1.6;">
+    <strong>${icon} ${meeting.platform} — ${roleLabel}</strong><br/>
+    Summary generated from calendar data. To add your notes and complete this report, visit
+    <a href="${APP_URL}" style="color:#1565c0;font-weight:700;">${APP_URL}</a>
+    — your notes will be saved to Drive automatically. No email will be sent.
+  </div>`
+
+  return buildAndSendReport(
+    meeting, gmail, drive, anthropic,
+    banner,
+    `calendar data (${meeting.isSiamakHost ? 'Google Meet host — notes can be added at VA' : 'attendee'})`,
+    datePrefix, startFormatted,
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!process.env.GOOGLE_REFRESH_TOKEN) return NextResponse.json({ ok: false, message: 'Google not connected' })
 
-  // Fetch meetings from all calendars in parallel
   const [googleMeetings, outlookMeetings] = await Promise.all([
     getGoogleMeetings(),
     getOutlookMeetings(),
   ])
 
-  // Merge and deduplicate by title + start time (same meeting on both calendars)
+  // Merge and deduplicate by title + start time
   const seen = new Set<string>()
   const allMeetings: UnifiedMeeting[] = []
   for (const m of [...googleMeetings, ...outlookMeetings]) {
     const key = `${m.title.toLowerCase().trim()}|${m.startAt.toISOString().slice(0, 16)}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      allMeetings.push(m)
-    }
+    if (!seen.has(key)) { seen.add(key); allMeetings.push(m) }
   }
 
   if (!allMeetings.length) {
-    return NextResponse.json({ ok: true, message: 'No video meetings ended in the past 90 minutes' })
+    return NextResponse.json({ ok: true, message: 'No video meetings ended in the past 4 hours' })
   }
 
   const auth  = await getAuthedClient()
@@ -491,9 +426,7 @@ export async function GET(req: NextRequest) {
   const drive = google.drive({ version: 'v3', auth })
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
-  // Check which meetings were already processed today
   const alreadyDone = await getAlreadyProcessedToday(gmail)
-
   const logs: string[] = []
 
   for (const meeting of allMeetings) {
@@ -502,7 +435,6 @@ export async function GET(req: NextRequest) {
       logs.push(`⏭ Already processed today: ${meeting.title}`)
       continue
     }
-
     try {
       const result = await processMeeting(meeting, gmail, drive, anthropic)
       logs.push(result)
@@ -513,10 +445,8 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    ok: true,
-    checked: allMeetings.length,
-    google: googleMeetings.length,
-    outlook: outlookMeetings.length,
+    ok: true, checked: allMeetings.length,
+    google: googleMeetings.length, outlook: outlookMeetings.length,
     logs,
   })
 }

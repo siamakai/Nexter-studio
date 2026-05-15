@@ -2,8 +2,12 @@
  * POST /api/meetings/notes
  *
  * Manual meeting notes submission — used when no transcript was recorded.
- * Accepts notes from the VA chat or direct API call, generates a summary,
- * saves to Google Drive, logs to GHL CRM, and emails info@i-review.ai.
+ * Called from va.nexterai.agency after Siamak submits his own notes.
+ *
+ * Generates a full AI summary from the notes, saves to the
+ * "Nexter AI — Meeting Reports" Google Drive folder, and logs to GHL CRM.
+ * No notification email is sent — the blue banner in the original report
+ * already explained this is where notes go.
  *
  * Body: { title, date?, attendees?, notes, contact_email? }
  */
@@ -12,11 +16,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   generateMeetingSummary,
   saveMeetingToDrive,
-  saveMeetingLocally,
   findGhlContact,
   addGhlNote,
-  sendMeetingEmail,
-  buildMeetingEmailHtml,
+  autoTagContact,
 } from '@/lib/meeting-report'
 
 function cors() {
@@ -47,15 +49,19 @@ export async function POST(req: NextRequest) {
   }
 
   const meetingDate = date || new Date().toLocaleString('en-GB', {
-    timeZone: 'Europe/Budapest', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'Europe/Budapest', weekday: 'long', day: 'numeric', month: 'long',
+    year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
   })
   const datePrefix = new Date().toISOString().slice(0, 10)
 
-  // Respond immediately, process in background
+  // Respond immediately — Drive + Claude can take a few seconds
   processNotes({ title, meetingDate, datePrefix, attendees, notes, contact_email })
     .catch(err => console.error('[meetings/notes]', err))
 
-  return NextResponse.json({ ok: true, message: 'Notes received — summary will be emailed shortly' }, { headers: cors() })
+  return NextResponse.json(
+    { ok: true, message: 'Notes received — summary will be saved to Drive shortly' },
+    { headers: cors() }
+  )
 }
 
 async function processNotes(opts: {
@@ -75,30 +81,26 @@ async function processNotes(opts: {
 
   const summary = await generateMeetingSummary(title, meetingDate, contextBlock)
 
-  const safeName = title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 50)
-  const localFilename = `${datePrefix}-manual-${safeName}.md`
-  const fileContent = `# ${title}\nDate: ${meetingDate}\nSource: Manual Notes${attendees ? `\nAttendees: ${attendees}` : ''}\n\n${summary}\n\n---\n*Submitted manually via Nexter AI VA*\n`
+  const fileContent = [
+    `# ${title}`,
+    `Date: ${meetingDate}`,
+    `Source: Manual Notes${attendees ? `\nAttendees: ${attendees}` : ''}`,
+    '',
+    summary,
+    '',
+    '---',
+    '*Notes submitted via Nexter AI VA · Nexter AI VA*',
+  ].join('\n')
 
-  await saveMeetingLocally(localFilename, fileContent)
-  const driveUrl = await saveMeetingToDrive(title, fileContent, datePrefix)
+  await saveMeetingToDrive(title, fileContent, datePrefix)
 
-  // Find CRM contact by provided email, attendee list, or meeting title
+  // CRM update
   let contact = contact_email ? await findGhlContact(contact_email) : null
   if (!contact && attendees) contact = await findGhlContact(attendees.split(/[,;\n]/)[0].trim())
   if (!contact) contact = await findGhlContact(title.split(/\s+/).slice(0, 3).join(' '))
 
   if (contact) {
     await addGhlNote(contact.id, `MEETING NOTES SUMMARY — ${meetingDate}\nMeeting: ${title}\n\n${summary}`)
+    await autoTagContact(contact.id, summary, title)
   }
-
-  const html = buildMeetingEmailHtml({
-    title,
-    date: meetingDate,
-    source: 'Manual Notes',
-    summary,
-    driveUrl,
-    contactName: contact?.name || null,
-  })
-
-  await sendMeetingEmail(`📋 Meeting Notes: ${title} — ${datePrefix}`, html)
 }
