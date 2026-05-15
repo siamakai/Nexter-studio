@@ -1,10 +1,41 @@
 /**
- * Productivity tools: Content Pipeline, Revenue Dashboard, Delegation Tracker
+ * Productivity tools: Tasks, Content Pipeline, Revenue Dashboard, Delegation Tracker
  */
 
-import { addContent, updateContent, listContent, getContentSummary, assignTask, updateDelegation, listDelegations } from '@/lib/supabase'
+import { addTask, getTasks, markTaskDone, addContent, updateContent, listContent, getContentSummary, assignTask, updateDelegation, listDelegations } from '@/lib/supabase'
 
 export const productivityTools = [
+  // ── Tasks ─────────────────────────────────────────────────────────────────
+  {
+    name: 'task_add',
+    description: 'Add a task to the to-do list. Use for any action item Siamak needs to do himself.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        content:      { type: 'string', description: 'What needs to be done' },
+        contact_name: { type: 'string', description: 'Related person or meeting (optional)' },
+        due_date:     { type: 'string', description: 'ISO date e.g. 2026-05-20 (optional)' },
+      },
+      required: ['content'],
+    },
+  },
+  {
+    name: 'task_list',
+    description: 'List all open tasks from the to-do list. Call this when asked about tasks, to-dos, or what needs to be done.',
+    input_schema: { type: 'object' as const, properties: {} },
+  },
+  {
+    name: 'task_done',
+    description: 'Mark a task as completed.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'Task ID to mark as done' },
+      },
+      required: ['id'],
+    },
+  },
+
   // ── Content Pipeline ──────────────────────────────────────────────────────
   {
     name: 'content_add',
@@ -110,6 +141,32 @@ export const productivityTools = [
 
 export async function execProductivityTool(name: string, input: Record<string, unknown>): Promise<string> {
   switch (name) {
+
+    case 'task_add': {
+      const task = await addTask(input.content as string, {
+        source:       'manual',
+        contact_name: input.contact_name as string | undefined,
+        due_date:     input.due_date as string | undefined,
+      })
+      return `✅ Task added: "${task?.content}"${task?.due_date ? ` — due ${task.due_date}` : ''} | ID: ${task?.id}`
+    }
+
+    case 'task_list': {
+      const tasks = await getTasks(false)
+      if (!tasks.length) return 'No open tasks. All clear!'
+      return `📋 Open Tasks (${tasks.length}):\n\n` + tasks.map((t, i) => {
+        const due     = t.due_date ? ` | Due: ${t.due_date}` : ''
+        const overdue = t.due_date && new Date(t.due_date) < new Date() ? ' ⚠️ OVERDUE' : ''
+        const contact = t.contact_name ? ` (re: ${t.contact_name})` : ''
+        const source  = t.source !== 'manual' ? ` [${t.source}]` : ''
+        return `${i + 1}. ${t.content}${contact}${due}${overdue}${source} | ID: ${t.id}`
+      }).join('\n')
+    }
+
+    case 'task_done': {
+      await markTaskDone(input.id as string)
+      return `✅ Task ${input.id} marked as done.`
+    }
 
     case 'content_add': {
       const item = await addContent({

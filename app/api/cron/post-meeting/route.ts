@@ -28,6 +28,7 @@ import {
   autoTagContact,
   buildMeetingEmailHtml,
   sendMeetingEmail,
+  extractAndSaveTasks,
 } from '@/lib/meeting-report'
 
 export const maxDuration = 60
@@ -272,7 +273,6 @@ async function createFollowUpDraft(
 async function buildAndSendReport(
   meeting: UnifiedMeeting,
   gmail: ReturnType<typeof google.gmail>,
-  drive: ReturnType<typeof google.drive>,
   anthropic: Anthropic,
   bannerHtml: string,
   transcriptSource: string,
@@ -291,6 +291,9 @@ async function buildAndSendReport(
   const summary = await generateMeetingSummary(
     meeting.title, startFormatted, contextNote, meeting.durationMin
   )
+
+  // Extract action items from summary and save as tasks
+  extractAndSaveTasks(summary, meeting.title, datePrefix).catch(() => null)
 
   const fileContent = [
     `# ${meeting.title}`,
@@ -356,7 +359,6 @@ async function buildAndSendReport(
 async function processMeeting(
   meeting: UnifiedMeeting,
   gmail: ReturnType<typeof google.gmail>,
-  drive: ReturnType<typeof google.drive>,
   anthropic: Anthropic,
 ): Promise<string> {
   const datePrefix     = meeting.startAt.toISOString().slice(0, 10)
@@ -377,7 +379,7 @@ async function processMeeting(
       Check <a href="https://zoom.us/recording" style="color:#B8963E;font-weight:700;">zoom.us/recording</a> to confirm the recording exists.
       This summary was generated from calendar data only.
     </div>`
-    return buildAndSendReport(meeting, gmail, drive, anthropic, banner, 'calendar data (Zoom webhook fallback)', datePrefix, startFormatted)
+    return buildAndSendReport(meeting, gmail, anthropic, banner, 'calendar data (Zoom webhook fallback)', datePrefix, startFormatted)
   }
 
   // ── S2 / S3 / S4: Google Meet host OR any attendee → immediate calendar-data + blue banner ──
@@ -391,7 +393,7 @@ async function processMeeting(
   </div>`
 
   return buildAndSendReport(
-    meeting, gmail, drive, anthropic,
+    meeting, gmail, anthropic,
     banner,
     `calendar data (${meeting.isSiamakHost ? 'Google Meet host — notes can be added at VA' : 'attendee'})`,
     datePrefix, startFormatted,
@@ -423,7 +425,6 @@ export async function GET(req: NextRequest) {
 
   const auth  = await getAuthedClient()
   const gmail = google.gmail({ version: 'v1', auth })
-  const drive = google.drive({ version: 'v3', auth })
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
   const alreadyDone = await getAlreadyProcessedToday(gmail)
@@ -436,7 +437,7 @@ export async function GET(req: NextRequest) {
       continue
     }
     try {
-      const result = await processMeeting(meeting, gmail, drive, anthropic)
+      const result = await processMeeting(meeting, gmail, anthropic)
       logs.push(result)
     } catch (err) {
       logs.push(`✗ Error processing "${meeting.title}": ${String(err)}`)

@@ -11,6 +11,7 @@ import {
   autoTagContact,
   sendMeetingEmail,
   buildMeetingEmailHtml,
+  extractAndSaveTasks,
 } from '@/lib/meeting-report'
 
 // ── Webhook verification ──────────────────────────────────────────────────────
@@ -124,6 +125,9 @@ async function processRecording(payload: Record<string, unknown>) {
 
   // Generate summary
   const summary = await generateMeetingSummary(topic, startTime, transcript, duration)
+
+  // Extract action items and save as tasks
+  extractAndSaveTasks(summary, topic, datePrefix).catch(() => null)
 
   const safeTopic = topic.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 50)
   const localFilename = `${datePrefix}-zoom-${safeTopic}.md`

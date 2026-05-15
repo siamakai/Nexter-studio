@@ -19,6 +19,7 @@ import {
   findGhlContact,
   addGhlNote,
   autoTagContact,
+  extractAndSaveTasks,
 } from '@/lib/meeting-report'
 
 function cors() {
@@ -80,6 +81,9 @@ async function processNotes(opts: {
   ].filter(Boolean).join('\n\n')
 
   const summary = await generateMeetingSummary(title, meetingDate, contextBlock)
+
+  // Extract action items and save as tasks
+  extractAndSaveTasks(summary, title, datePrefix).catch(() => null)
 
   const fileContent = [
     `# ${title}`,
