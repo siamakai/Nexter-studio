@@ -17,7 +17,12 @@ export function getMsAuthUrl() {
     scope: MS_SCOPES,
     response_mode: 'query',
     prompt: 'consent',
+    domain_hint: 'organizations',  // skip personal account option, go straight to work login
   })
+  // Pre-fill the email if configured so it skips the account picker
+  if (process.env.MS_ACCOUNT_EMAIL) {
+    params.set('login_hint', process.env.MS_ACCOUNT_EMAIL)
+  }
   return `${AUTH_URL}?${params}`
 }
 
