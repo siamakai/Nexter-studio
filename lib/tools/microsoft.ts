@@ -48,6 +48,21 @@ export const microsoftTools = [
     },
   },
   {
+    name: 'ms_create_draft',
+    description: 'Save an email as a draft in Outlook (does NOT send). Use this when asked to draft, prepare, or write an email in Outlook.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        account_email: MS_ACCOUNT_PROP,
+        to: { type: 'string', description: 'Recipient email address' },
+        subject: { type: 'string', description: 'Email subject' },
+        body: { type: 'string', description: 'Email body (plain text or HTML)' },
+        is_html: { type: 'boolean', description: 'Set true if body is HTML (default false)' },
+      },
+      required: ['account_email', 'to', 'subject', 'body'],
+    },
+  },
+  {
     name: 'ms_list_calendar',
     description: 'List upcoming events from a Microsoft 365 calendar.',
     input_schema: {
@@ -105,6 +120,19 @@ export async function execMicrosoftTool(name: string, input: Record<string, unkn
         const from = (m.from as Record<string, Record<string, string>>)?.emailAddress
         return `ID: ${m.id}\nFrom: ${from?.name || ''} <${from?.address || ''}>\nSubject: ${m.subject}\nDate: ${m.receivedDateTime}\nRead: ${m.isRead}\nPreview: ${(m.bodyPreview as string)?.slice(0, 100)}`
       }).join('\n\n---\n\n')
+    }
+
+    case 'ms_create_draft': {
+      const draft = await graphFetch(email, '/me/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          subject: input.subject,
+          body: { contentType: input.is_html ? 'HTML' : 'Text', content: input.body },
+          toRecipients: [{ emailAddress: { address: input.to } }],
+          isDraft: true,
+        }),
+      })
+      return `Draft saved in Outlook Drafts folder.\nTo: ${input.to}\nSubject: ${input.subject}\nID: ${draft.id}\n\nOpen Outlook to review and send when ready.`
     }
 
     case 'ms_send_email': {

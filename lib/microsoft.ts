@@ -4,6 +4,7 @@ const AUTH_URL = `https://login.microsoftonline.com/${process.env.MS_TENANT_ID |
 export const MS_SCOPES = [
   'https://graph.microsoft.com/Mail.Read',
   'https://graph.microsoft.com/Mail.Send',
+  'https://graph.microsoft.com/Mail.ReadWrite',
   'https://graph.microsoft.com/Calendars.ReadWrite',
   'offline_access',
 ].join(' ')
@@ -78,6 +79,8 @@ export async function graphFetch(email: string, path: string, options: RequestIn
     },
   })
   if (!res.ok) throw new Error(`Graph API error ${res.status}: ${await res.text()}`)
-  if (res.status === 204) return {}
-  return res.json()
+  // 204 No Content and 202 Accepted both have empty bodies
+  if (res.status === 204 || res.status === 202) return {}
+  const text = await res.text()
+  return text ? JSON.parse(text) : {}
 }
