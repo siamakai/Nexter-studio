@@ -3,6 +3,7 @@
  */
 
 import { addTask, getTasks, markTaskDone, addContent, updateContent, listContent, getContentSummary, assignTask, updateDelegation, listDelegations } from '@/lib/supabase'
+import { postToLinkedIn } from '@/lib/linkedin-post'
 
 export const productivityTools = [
   // ── Tasks ─────────────────────────────────────────────────────────────────
@@ -133,6 +134,31 @@ export const productivityTools = [
         status: { type: 'string', description: 'assigned | in_progress | done | overdue' },
         notes: { type: 'string' },
         due_date: { type: 'string' },
+      },
+      required: ['id'],
+    },
+  },
+
+  // ── Content Posting ───────────────────────────────────────────────────────
+  {
+    name: 'content_review',
+    description: 'Show the AI-generated draft text (and image URL) for a content item before posting.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'Content item ID' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'content_post',
+    description: 'Post an approved content draft to LinkedIn. Use after reviewing with content_review. Posts the draft_text and draft_image_url saved for the content item.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'Content item ID to post' },
+        override_text: { type: 'string', description: 'Optional: override the draft text with this custom text before posting' },
       },
       required: ['id'],
     },
@@ -300,6 +326,44 @@ export async function execProductivityTool(name: string, input: Record<string, u
       if (input.due_date) updates.due_date = input.due_date as string
       await updateDelegation(input.id as string, updates)
       return `✅ Delegation ${input.id} updated to: ${input.status || 'updated'}`
+    }
+
+    case 'content_review': {
+      const items = await listContent()
+      const item = items.find(i => i.id === input.id)
+      if (!item) return `Content item ${input.id} not found.`
+      if (!item.draft_text) return `No draft generated yet for "${item.title}". Status: ${item.status}. Run the content-draft cron or set status to 'ready'.`
+      return [
+        `📝 Draft for: ${item.title}`,
+        `Type: ${item.type} | Status: ${item.status}`,
+        item.scheduled_date ? `Scheduled: ${item.scheduled_date}` : '',
+        '',
+        '--- POST TEXT ---',
+        item.draft_text,
+        '',
+        item.draft_image_url ? `--- IMAGE ---\n${item.draft_image_url}` : '(No image generated)',
+        '',
+        `To post: use content_post with id="${item.id}"`,
+      ].filter(l => l !== '').join('\n')
+    }
+
+    case 'content_post': {
+      const items = await listContent()
+      const item = items.find(i => i.id === input.id)
+      if (!item) return `Content item ${input.id} not found.`
+      const postText = (input.override_text as string | undefined) || item.draft_text
+      if (!postText) return `No draft text for "${item.title}". Generate a draft first (set status to 'ready' so the cron picks it up).`
+
+      const result = await postToLinkedIn(postText, item.draft_image_url || null)
+      if (result.ok) {
+        await updateContent(item.id!, {
+          status: 'published',
+          published_date: new Date().toISOString().slice(0, 10),
+        })
+        return `✅ Posted to LinkedIn: "${item.title}"\n${item.draft_image_url ? 'Image included.' : 'Text only.'}`
+      } else {
+        return `❌ LinkedIn post failed: ${result.error}`
+      }
     }
 
     default:

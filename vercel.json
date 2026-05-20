@@ -30,7 +30,7 @@
     },
     {
       "path": "/api/cron/content",
-      "schedule": "0 5 * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/delegations",

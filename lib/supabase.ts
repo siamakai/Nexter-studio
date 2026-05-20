@@ -141,10 +141,12 @@ export interface ContentItem {
   title: string
   type: string        // linkedin | reel | blog | email | other
   platform?: string
-  status: string      // idea | drafting | ready | scheduled | published
+  status: string      // idea | drafting | ready | draft_ready | scheduled | published
   scheduled_date?: string
   published_date?: string
   notes?: string
+  draft_text?: string      // AI-generated post copy, ready for approval
+  draft_image_url?: string // DALL-E generated image URL
   created_at?: string
   updated_at?: string
 }

@@ -88,10 +88,14 @@ export async function execMicrosoftTool(name: string, input: Record<string, unkn
       const params = new URLSearchParams({
         $top: String(input.max_results || 10),
         $select: 'id,subject,from,receivedDateTime,isRead,bodyPreview',
-        $orderby: 'receivedDateTime desc',
       })
-      if (input.filter) params.set('$filter', input.filter as string)
-      if (input.search) params.set('$search', `"${input.search}"`)
+      if (input.search) {
+        // $search and $orderby are mutually exclusive in Graph API
+        params.set('$search', `"${input.search}"`)
+      } else {
+        params.set('$orderby', 'receivedDateTime desc')
+        if (input.filter) params.set('$filter', input.filter as string)
+      }
 
       const data = await graphFetch(email, `/me/messages?${params}`)
       const messages = data.value || []
